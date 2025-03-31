@@ -1,0 +1,32 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Go workspace directory typically contains databases etc./cache files
+# You can add this if you want, but it's not usually committed.
+# /.vscode/
+
+# Dependency directories (should be handled by go modules)
+# vendor/
+
+# Compiled binary name(s)
+ts-ssh
+ts-ssh-*
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# tsnet state directory (optional - depends if you ever run it in the repo dir)
+# If your default is ~/.config/ts-ssh-client, this isn't strictly needed here.
+# If you use the fallback ts-ssh-client-state, add it:
+ts-ssh-client-state/
