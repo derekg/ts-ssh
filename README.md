@@ -32,7 +32,7 @@ You can install `ts-ssh` using `go install` (recommended) or build it manually f
 **Using `go install`:**
 
 ```bash
-go install github.com/yourusername/ts-ssh@latest
+go install github.com/derekg/ts-ssh@latest
 ```
 *(Make sure your `$GOPATH/bin` or `$HOME/go/bin` is in your system's `PATH`)*
 
@@ -40,7 +40,7 @@ go install github.com/yourusername/ts-ssh@latest
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/yourusername/ts-ssh.git
+    git clone https://github.com/derekg/ts-ssh.git
     cd ts-ssh
     ```
 2.  Build the executable:
