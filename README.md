@@ -73,7 +73,7 @@ You can easily cross-compile for other platforms. Set the `GOOS` and `GOARCH` en
 ## Usage
 
 ```
-Usage: ts-ssh [options] [user@]hostname[:port]
+Usage: ts-ssh [options] [user@]hostname[:port] [command...]
 
 Connects to a host on your Tailscale network via SSH using tsnet.
 
@@ -86,6 +86,10 @@ Options:
         SSH Username (default: current OS user)
   -tsnet-dir string
         Directory to store tsnet state (default "~/.config/ts-ssh-client")
+  -W string
+        Forward stdio to destination host:port (for use as ProxyCommand)
+  -version
+        Print version and exit
   -v    Verbose logging
 ```
 
@@ -124,6 +128,25 @@ Options:
     ```bash
     ts-ssh -insecure your-server
     ```
+*   Print the client version and exit:
+    ```bash
+    ts-ssh -version
+    ```
+  
+*   Run a remote command without an interactive shell:
+    ```bash
+    ts-ssh your-server uname -a
+    ```
+*   Proxy raw TCP via your tailnet (e.g., for scp or other ProxyCommand uses):
+    ```bash
+    ts-ssh -W your-server:22
+    # Or with scp:
+    scp -o ProxyCommand="ts-ssh -W %h:%p" localfile remote:/path
+    ```
+*   During an interactive session, type `~.` at the start of a line to terminate the session.
+  
+**Note:**
+The Tailscale authentication flow and server logs may interleave in the console during startup, which can be confusing. Use `-v` for more verbose, ordered logging if you need clearer startup output.
 
 ## Tailscale Authentication
 

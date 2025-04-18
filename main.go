@@ -28,6 +28,9 @@ import (
 	// "tailscale.com/ipn/ipnstate"
 )
 
+// version is set at build time via -ldflags "-X main.version=..."; default is "dev".
+var version = "dev"
+
 const (
 	defaultSSHPort = "22"
 	clientName     = "ts-ssh-client" // How this client appears in Tailscale admin console
@@ -43,6 +46,10 @@ func main() {
 		target          string
 		verbose         bool
 		insecureHostKey bool
+		// forwardDest, if set, will proxy stdio to this host:port via tsnet (ProxyCommand -W)
+		forwardDest string
+		// showVersion prints the tool version and exits
+		showVersion bool
 	)
 
 	currentUser, err := user.Current()
@@ -66,18 +73,36 @@ func main() {
 	flag.StringVar(&tsControlURL, "control-url", "", "Tailscale control plane URL (optional)")
 	flag.BoolVar(&verbose, "v", false, "Verbose logging")
 	flag.BoolVar(&insecureHostKey, "insecure", false, "Disable host key checking (INSECURE!)")
+	// ProxyCommand-style forwarding: direct stdio to dest via tsnet
+	flag.StringVar(&forwardDest, "W", "", "forward stdio to destination host:port (for use as ProxyCommand)")
+	flag.BoolVar(&showVersion, "version", false, "Print version and exit")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [options] [user@]hostname[:port]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [options] [user@]hostname[:port] [command...]\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Connects to a host on your Tailscale network via SSH using tsnet.\n\nOptions:\n")
 		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  %s user@host           # interactive SSH session\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s user@host ls -lah    # run a remote command non-interactively\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -W host:port        # proxy stdio to host:port via Tailscale (for ProxyCommand)\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  scp -o ProxyCommand=\"%s -W %%h:%%p user@gateway\" localfile remote:/path\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -version           # print version and exit\n", os.Args[0])
 	}
+	// Parse flags and arguments: require at least target, optional command
 	flag.Parse()
-
-	if flag.NArg() != 1 {
+	if showVersion {
+		fmt.Fprintf(os.Stdout, "%s\n", version)
+		os.Exit(0)
+	}
+	if flag.NArg() < 1 {
 		flag.Usage()
 		os.Exit(1)
 	}
 	target = flag.Arg(0)
+	// Any additional args are treated as a remote command to execute
+	var remoteCmd []string
+	if flag.NArg() > 1 {
+		remoteCmd = flag.Args()[1:]
+	}
 
 	// --- Parse Target: [user@]hostname[:port] ---
 	targetHost, targetPort, err := parseTarget(target)
@@ -115,9 +140,9 @@ func main() {
 
 	srv := &tsnet.Server{
 		Dir:        tsnetDir,
-		Hostname:   clientName, // How this client identifies itself on the tailnet
+		Hostname:   clientName,    // How this client identifies itself on the tailnet
 		Logf:       logger.Printf, // Use our configured logger
-		ControlURL: tsControlURL,   // Optional: Use custom control server
+		ControlURL: tsControlURL,  // Optional: Use custom control server
 	}
 	// Defer closing the tsnet server to disconnect from Tailscale on exit
 	defer srv.Close()
@@ -132,7 +157,7 @@ func main() {
 	go func() {
 		<-sigCh
 		logger.Println("Signal received, shutting down...")
-		cancel() // Cancel the context
+		cancel()    // Cancel the context
 		srv.Close() // Ensure tsnet is closed
 		// Restore terminal potentially needed if shutdown happens during session
 		fd := int(os.Stdin.Fd())
@@ -145,7 +170,6 @@ func main() {
 
 	logger.Printf("Initializing tsnet in directory: %s", tsnetDir)
 	fmt.Fprintf(os.Stderr, "Starting Tailscale connection... You may need to authenticate.\nCheck logs (-v) or look for a URL printed below if needed.\n")
-
 
 	// Start the tsnet server. This blocks until preferences are fetched
 	// or fatally errors. It *doesn't* block until fully connected/authenticated usually.
@@ -162,17 +186,33 @@ func main() {
 	// The Logf callback already handles printing it if verbose.
 	if !verbose && status != nil && status.AuthURL != "" {
 		fmt.Fprintf(os.Stderr, "\nTo authenticate, visit:\n%s\n", status.AuthURL)
-        // Give the user some time, or instruct them to restart after auth
-        fmt.Fprintf(os.Stderr, "Please authenticate in the browser and potentially restart the client if connection fails.\n")
-        // Consider adding a longer wait or a loop checking status again here for better UX
+		// Give the user some time, or instruct them to restart after auth
+		fmt.Fprintf(os.Stderr, "Please authenticate in the browser and potentially restart the client if connection fails.\n")
+		// Consider adding a longer wait or a loop checking status again here for better UX
 	}
 
-
+	// Wait briefly for the connection to likely establish *after* potential auth.
+	// A more robust method would involve checking srv.Status() in a loop.
 	// Wait briefly for the connection to likely establish *after* potential auth.
 	// A more robust method would involve checking srv.Status() in a loop.
 	logger.Println("Waiting briefly for Tailscale connection to establish...")
 	time.Sleep(3 * time.Second) // Adjust as needed
 
+	// If requested, proxy raw TCP for ProxyCommand-style forwarding (-W)
+	if forwardDest != "" {
+		logger.Printf("Forwarding stdio to %s via tsnet...", forwardDest)
+		fwdConn, err := srv.Dial(ctx, "tcp", forwardDest)
+		if err != nil {
+			log.Fatalf("Failed to dial %s via tsnet for forwarding: %v", forwardDest, err)
+		}
+		// Pipe stdin to remote, and remote to stdout
+		go func() {
+			_, _ = io.Copy(fwdConn, os.Stdin)
+			fwdConn.Close()
+		}()
+		_, _ = io.Copy(os.Stdout, fwdConn)
+		os.Exit(0)
+	}
 	logger.Printf("tsnet potentially initialized. Attempting SSH connection to %s@%s:%s", sshUser, targetHost, targetPort)
 
 	// --- SSH Client Configuration ---
@@ -253,6 +293,26 @@ func main() {
 	client := ssh.NewClient(sshConn, chans, reqs)
 	defer client.Close()
 
+	// If a remote command was provided, run it non-interactively and exit
+	if len(remoteCmd) > 0 {
+		logger.Printf("Running remote command: %v", remoteCmd)
+		session, err := client.NewSession()
+		if err != nil {
+			log.Fatalf("Failed to create SSH session for remote command: %v", err)
+		}
+		defer session.Close()
+		session.Stdout = os.Stdout
+		session.Stderr = os.Stderr
+		session.Stdin = os.Stdin
+		cmd := strings.Join(remoteCmd, " ")
+		if err := session.Run(cmd); err != nil {
+			if exitErr, ok := err.(*ssh.ExitError); ok {
+				os.Exit(exitErr.ExitStatus())
+			}
+			log.Fatalf("Remote command execution failed: %v", err)
+		}
+		os.Exit(0)
+	}
 	// --- Start Interactive SSH Session ---
 	logger.Println("Starting interactive SSH session...")
 	session, err := client.NewSession()
@@ -276,9 +336,11 @@ func main() {
 		logger.Println("Input is not a terminal, proceeding without raw mode or PTY request.")
 	}
 
-
-	// Set up standard pipes
-	session.Stdin = os.Stdin
+	// Set up I/O with escape detection for interactive session
+	stdinPipe, err := session.StdinPipe()
+	if err != nil {
+		log.Fatalf("Failed to create stdin pipe for SSH session: %v", err)
+	}
 	session.Stdout = os.Stdout
 	session.Stderr = os.Stderr
 
@@ -310,7 +372,44 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to start remote shell: %v", err)
 	}
-
+	// Inform about escape sequence
+	fmt.Fprintf(os.Stderr, "\nEscape sequence: ~. to terminate session\n")
+	// Handle user input with escape (~.) detection
+	go func() {
+		reader := bufio.NewReader(os.Stdin)
+		state := true // at start of line
+		for {
+			b, err := reader.ReadByte()
+			if err != nil {
+				return
+			}
+			if state && b == '~' {
+				next, errPeek := reader.Peek(1)
+				if errPeek == nil {
+					if next[0] == '.' {
+						// consume dot and exit
+						reader.ReadByte()
+						if oldState != nil && term.IsTerminal(fd) {
+							term.Restore(fd, oldState)
+						}
+						os.Exit(0)
+					} else if next[0] == '~' {
+						// literal ~
+						reader.ReadByte()
+						stdinPipe.Write([]byte{'~'})
+						state = false
+						continue
+					}
+				}
+			}
+			stdinPipe.Write([]byte{b})
+			if b == '\n' || b == '\r' {
+				state = true
+			} else {
+				state = false
+			}
+		}
+	}()
 	// Wait for the session to finish
 	err = session.Wait()
 
@@ -319,7 +418,6 @@ func main() {
 	if oldState != nil && term.IsTerminal(fd) {
 		term.Restore(fd, oldState) // Ensure terminal is restored
 	}
-
 
 	if err != nil {
 		// Don't log fatal if it's just the remote command exiting non-zero
@@ -442,7 +540,6 @@ func createKnownHostsCallback(currentUser *user.User) (ssh.HostKeyCallback, erro
 		return ssh.InsecureIgnoreHostKey(), fmt.Errorf("failed to create %s directory, disabling host key check: %w", sshDir, err)
 	}
 
-
 	// Create the file if it doesn't exist, as knownhosts.New might need it.
 	f, err := os.OpenFile(knownHostsPath, os.O_CREATE|os.O_RDONLY, 0600)
 	if err != nil {
@@ -536,8 +633,8 @@ func appendKnownHost(knownHostsPath, hostname string, remote net.Addr, key ssh.P
 	//       addresses = append(addresses, hostname)
 	//   }
 	// } else if hostname != normalizedAddress { // If normalized wasn't an IP host:port string
-    //  addresses = append(addresses, hostname)
-    // }
+	//  addresses = append(addresses, hostname)
+	// }
 	// -> Sticking to just normalizedAddress for now for simplicity like standard ssh often does on first connect.
 
 	line := knownhosts.Line([]string{normalizedAddress}, key)
@@ -549,8 +646,6 @@ func appendKnownHost(knownHostsPath, hostname string, remote net.Addr, key ssh.P
 	fmt.Fprintf(os.Stderr, "Warning: Permanently added '%s' (%s) to the list of known hosts.\n", normalizedAddress, key.Type())
 	return nil // Key accepted and added successfully
 }
-
-
 
 // watchWindowSize monitors terminal size changes and informs the SSH session.
 func watchWindowSize(fd int, session *ssh.Session) {
@@ -565,7 +660,6 @@ func watchWindowSize(fd int, session *ssh.Session) {
 		}
 	}
 
-
 	// Update on signal
 	for range sigCh {
 		if term.IsTerminal(fd) {
@@ -576,7 +670,6 @@ func watchWindowSize(fd int, session *ssh.Session) {
 		}
 	}
 }
-
 
 // promptUserViaTTY reads a line directly from the controlling TTY,
 // useful when stdin/stdout might be redirected (like during SSH).
