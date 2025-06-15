@@ -1,8 +1,8 @@
 # ts-ssh: Tailscale tsnet SSH Client
 
-A command-line SSH client written in Go that utilizes `tsnet` to connect to hosts on your Tailscale network without requiring the full Tailscale client daemon to be running.
+A command-line SSH client and SCP utility written in Go that utilizes `tsnet` to connect to hosts on your Tailscale network without requiring the full Tailscale client daemon to be running.
 
-This allows you to establish a userspace connection to your Tailscale network and then SSH into your nodes directly from this tool.
+This allows you to establish a userspace connection to your Tailscale network and then SSH into your nodes directly from this tool, or transfer files using SCP.
 
 ## Features
 
@@ -17,6 +17,13 @@ This allows you to establish a userspace connection to your Tailscale network an
     *   Prompts user to accept and save keys for unknown hosts.
     *   Warns loudly and prevents connection if a known host key changes (potential MITM).
 *   Optional insecure mode (`-insecure`) to disable host key checking (Use with extreme caution!).
+*   **Interactive Text-based User Interface (TUI) mode (`-tui` flag):**
+    *   Lists peers on your Tailscale network.
+    *   Displays host online/offline status and prevents actions on offline peers.
+    *   Allows selection of hosts for SSH or SCP operations.
+*   **Direct command-line SCP functionality:**
+    *   Supports `local_path user@hostname:remote_path` for uploads.
+    *   Supports `user@hostname:remote_path local_path` for downloads.
 *   Cross-platform: Can be compiled for Linux, macOS (Intel/ARM), Windows, etc.
 
 ## Prerequisites
@@ -74,8 +81,11 @@ You can easily cross-compile for other platforms. Set the `GOOS` and `GOARCH` en
 
 ```
 Usage: ts-ssh [options] [user@]hostname[:port] [command...]
+       ts-ssh [options] local_path user@hostname:remote_path
+       ts-ssh [options] user@hostname:remote_path local_path
 
-Connects to a host on your Tailscale network via SSH using tsnet.
+Connects to a host on your Tailscale network via SSH or SCP using tsnet.
+Can also launch an interactive TUI with the -tui flag.
 
 Options:
   -i string
@@ -86,6 +96,8 @@ Options:
         SSH Username (default: current OS user)
   -tsnet-dir string
         Directory to store tsnet state (default "~/.config/ts-ssh-client")
+  -tui
+        Enable interactive TUI mode
   -W string
         Forward stdio to destination host:port (for use as ProxyCommand)
   -version
@@ -95,10 +107,15 @@ Options:
 
 **Arguments:**
 
-*   `[user@]hostname[:port]`: The target to connect to.
+*   For SSH: `[user@]hostname[:port] [command...]`
     *   `hostname` **must** be the Tailscale MagicDNS name or Tailscale IP address of the target machine.
-    *   `user` defaults to your current OS username if not provided.
+    *   `user` defaults to your current OS username if not provided or specified with `-l`.
     *   `port` defaults to `22` if not provided.
+    *   `command...` (optional): If provided, executes the command on the remote host instead of starting an interactive shell.
+*   For SCP (direct CLI):
+    *   Upload: `local_path [user@]hostname:remote_path`
+    *   Download: `[user@]hostname:remote_path local_path`
+    *   The `user@` in the remote argument is optional; if not provided, the user from `-l` or the default OS user will be used.
 
 **Examples:**
 
@@ -137,13 +154,33 @@ Options:
     ```bash
     ts-ssh your-server uname -a
     ```
-*   Proxy raw TCP via your tailnet (e.g., for scp or other ProxyCommand uses):
+*   **Launch the Interactive TUI:**
+    ```bash
+    ts-ssh -tui
+    ```
+*   **Direct SCP Upload:**
+    ```bash
+    ts-ssh mylocalfile.txt your-server:/remote/path/
+    # OR with a specific user
+    ts-ssh mylocalfile.txt an_user@your-server:/remote/path/
+    # OR using -l flag for user
+    ts-ssh -l an_user mylocalfile.txt your-server:/remote/path/
+    ```
+*   **Direct SCP Download:**
+    ```bash
+    ts-ssh your-server:/remote/file.txt .
+    # OR with a specific user
+    ts-ssh another_user@your-server:/remote/file.txt /local/destination/
+    ```
+*   Proxy raw TCP via your tailnet (e.g., for standard `scp` or other `ProxyCommand` uses):
     ```bash
     ts-ssh -W your-server:22
-    # Or with scp:
-    scp -o ProxyCommand="ts-ssh -W %h:%p" localfile remote:/path
+    # Or with standard scp, using ts-ssh as a ProxyCommand:
+    scp -o ProxyCommand="ts-ssh -W %h:%p" localfile your-server:/remote/path
+    # If 'your-server' in the scp command needs a specific user that ts-ssh's -l flag should handle:
+    scp -o ProxyCommand="ts-ssh -l proxyuser -W %h:%p" localfile actualuser@your-server:/remote/path
     ```
-*   During an interactive session, type `~.` at the start of a line to terminate the session.
+*   During an interactive SSH session, type `~.` at the start of a line to terminate the session.
   
 **Note:**
 The Tailscale authentication flow and server logs may interleave in the console during startup, which can be confusing. Use `-v` for more verbose, ordered logging if you need clearer startup output.
@@ -164,4 +201,3 @@ Once authorized, `ts-ssh` stores authentication keys in the state directory (`~/
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
