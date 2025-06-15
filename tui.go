@@ -1,22 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
-	// "os" // Removed as it's not used
-	"context"
-	// "log" // Already available
 	"strings"
-
-	// These specific bubbletea components might not be directly used if tview is the primary TUI library
-	// "github.com/charmbracelet/bubbles/list"
-	// "github.com/charmbracelet/bubbles/textinput"
-	// tea "github.com/charmbracelet/bubbletea"
-	// "github.com/charmbracelet/lipgloss"
+	"time"
 
 	"github.com/gdamore/tcell/v2" // Import tcell
 	"github.com/rivo/tview"      // Import tview
-	// "tailscale.com/client/tailscale/apitype" // This might not be directly used here
 	"tailscale.com/ipn/ipnstate" // Import for ipnstate.Status
 	"tailscale.com/tsnet"        // Import for tsnet.Server
 )
@@ -61,15 +53,15 @@ func startTUI(app *tview.Application, srv *tsnet.Server, appCtx context.Context,
 	hostList.SetBorder(true).SetTitle("Select a Host (ts-ssh) - Press (q) or Ctrl+C to Quit")
 
 	// TextView for informational messages below the host list
+	originalInfoText := "Use arrow keys to navigate, Enter to select. Press (q) or Ctrl+C to quit."
 	infoBox := tview.NewTextView().
 		SetTextAlign(tview.AlignCenter).
 		SetDynamicColors(true). // Enable dynamic colors for infoBox
-		SetText("Use arrow keys to navigate, Enter to select. Press (q) or Ctrl+C to quit.")
+		SetText(originalInfoText)
 
 	// Function to populate the host list from Tailscale status
 	populateHostList := func(currentStatus *ipnstate.Status) {
 		hostList.Clear() // Clear previous items
-		originalInfoText := "Use arrow keys to navigate, Enter to select. Press (q) or Ctrl+C to quit." // Store original info text
 
 		if currentStatus == nil || len(currentStatus.Peer) == 0 {
 			hostList.AddItem("No peers found", "Please check your Tailscale network or wait for connection.", 0, nil)
