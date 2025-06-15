@@ -47,7 +47,7 @@ func performSCPTransfer(
 
 	var authMethods []ssh.AuthMethod
 	if sshKeyPath != "" {
-		keyAuth, keyErr := loadPrivateKey(sshKeyPath, logger) // loadPrivateKey is in ssh_client.go
+		keyAuth, keyErr := LoadPrivateKey(sshKeyPath, logger) // LoadPrivateKey is in ssh_client.go
 		if keyErr == nil {
 			authMethods = append(authMethods, keyAuth)
 			logger.Printf("SCP Connect: Using public key authentication: %s", sshKeyPath)
@@ -76,7 +76,7 @@ func performSCPTransfer(
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	} else {
 		// createKnownHostsCallback is in ssh_client.go
-		hostKeyCallback, hkErr = createKnownHostsCallback(currentUser, logger)
+		hostKeyCallback, hkErr = CreateKnownHostsCallback(currentUser, logger)
 		if hkErr != nil {
 			return fmt.Errorf("SCP: Could not set up host key verification: %w", hkErr)
 		}

@@ -300,7 +300,7 @@ func main() {
 			remoteCmd = flag.Args()[1:]
 		}
 
-		targetHost, targetPort, err := parseTarget(target, defaultSSHPort)
+		targetHost, targetPort, err := parseTarget(target, DefaultSshPort)
 		if err != nil {
 			logger.Fatalf("Error parsing target for SSH: %v", err)
 		}
@@ -361,7 +361,7 @@ func main() {
 		logger.Printf("tsnet potentially initialized. Attempting SSH connection to %s@%s:%s", sshSpecificUser, targetHost, targetPort)
 
 		authMethods := []ssh.AuthMethod{}
-		keyAuth, err := loadPrivateKey(sshKeyPath, logger)
+		keyAuth, err := LoadPrivateKey(sshKeyPath, logger)
 		if err == nil {
 			authMethods = append(authMethods, keyAuth)
 			logger.Printf("Using public key authentication: %s", sshKeyPath)
@@ -383,7 +383,7 @@ func main() {
 			logger.Println("WARNING: Host key verification is disabled!")
 			hostKeyCallback = ssh.InsecureIgnoreHostKey()
 		} else {
-			hostKeyCallback, err = createKnownHostsCallback(currentUser, logger)
+			hostKeyCallback, err = CreateKnownHostsCallback(currentUser, logger)
 			if err != nil {
 				log.Fatalf("Could not set up host key verification: %v", err)
 			}
@@ -543,4 +543,3 @@ func main() {
 
 // Moved to tsnet_handler.go:
 // func initTsNet(...) (*tsnet.Server, context.Context, *ipnstate.Status, error)
->>>>>>> REPLACE
