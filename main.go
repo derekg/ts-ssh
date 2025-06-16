@@ -134,6 +134,18 @@ func main() {
 	}
 	flag.Parse()
 
+	// If TUI mode is detected, redirect stderr immediately before any goroutines start
+	var originalStderr *os.File
+	var stderrDevNull *os.File
+	if tuiMode {
+		originalStderr = os.Stderr
+		var err error
+		stderrDevNull, err = os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+		if err == nil {
+			os.Stderr = stderrDevNull
+		}
+	}
+
 	var logger *log.Logger
 	if verbose {
 		logger = log.Default()
@@ -173,18 +185,11 @@ func main() {
 			}
 		}()
 
-		// Redirect stderr during TUI to prevent background library output
-		originalStderr := os.Stderr
-		devNull, devNullErr := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
-		if devNullErr == nil {
-			os.Stderr = devNull
-		}
-		
 		tuiResult, errTUI := startTUI(app, srv, appCtx, tuiLogger, initialStatus, sshUser, sshKeyPath, insecureHostKey, verbose)
 		
-		// Restore stderr immediately after TUI exits
-		if devNullErr == nil {
-			devNull.Close()
+		// Restore stderr after TUI operations complete
+		if stderrDevNull != nil {
+			stderrDevNull.Close()
 			os.Stderr = originalStderr
 		}
 		if errTUI != nil {
