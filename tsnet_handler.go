@@ -14,7 +14,7 @@ import (
 
 // initTsNet initializes the tsnet server and returns the server instance, context,
 // current Tailscale status, and any error that occurred.
-func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsControlURL string, verbose bool) (*tsnet.Server, context.Context, *ipnstate.Status, error) {
+func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsControlURL string, verbose bool, tuiMode bool) (*tsnet.Server, context.Context, *ipnstate.Status, error) {
 	if tsnetDir == "" {
 		// Fallback directory name if user.Current() failed in main or not provided.
 		// This is less ideal as it's not user-specific.
@@ -49,7 +49,7 @@ func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsCon
 
 	// Attempt to bring up the tsnet server.
 	// srv.Up will block until the server is up or context is cancelled.
-	if !verbose {
+	if !verbose && !tuiMode {
 		fmt.Fprintf(os.Stderr, "Starting Tailscale connection... You may need to authenticate.\nLook for a URL printed below if needed.\n")
 	}
 	status, err := srv.Up(ctx)
@@ -65,7 +65,7 @@ func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsCon
 	}
 
 	// If not verbose and an AuthURL is present, print it to help the user.
-	if !verbose && status != nil && status.AuthURL != "" {
+	if !verbose && !tuiMode && status != nil && status.AuthURL != "" {
 		fmt.Fprintf(os.Stderr, "\nTo authenticate, visit:\n%s\n", status.AuthURL)
 		fmt.Fprintf(os.Stderr, "Please authenticate in the browser. The client will then attempt to connect.\n")
 	}

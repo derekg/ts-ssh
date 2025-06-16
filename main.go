@@ -148,7 +148,9 @@ func main() {
 
 	if tuiMode {
 		app := tview.NewApplication()
-		srv, ctx, initialStatus, errTUI := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose)
+		// For TUI mode, always use a discarded logger to prevent output interference
+		tuiLogger := log.New(io.Discard, "", 0)
+		srv, ctx, initialStatus, errTUI := initTsNet(tsnetDir, clientName, tuiLogger, tsControlURL, verbose, true)
 		if errTUI != nil {
 			os.Exit(1) 
 		}
@@ -170,28 +172,37 @@ func main() {
 			}
 		}()
 
-		tuiResult, errTUI := startTUI(app, srv, appCtx, logger, initialStatus, sshUser, sshKeyPath, insecureHostKey, verbose)
+		tuiResult, errTUI := startTUI(app, srv, appCtx, tuiLogger, initialStatus, sshUser, sshKeyPath, insecureHostKey, verbose)
 		if errTUI != nil {
-			logger.Fatalf("TUI error: %v", errTUI)
+			if verbose {
+				logger.Fatalf("TUI error: %v", errTUI)
+			} else {
+				os.Exit(1)
+			}
 		}
-		logger.Println("TUI finished.")
+		if verbose {
+			logger.Println("TUI finished.")
+		}
 
 		switch tuiResult.action {
 		case "ssh":
 			if tuiResult.selectedHostTarget != "" {
-				logger.Printf("Host selected for SSH: %s. Proceeding with connection...\n", tuiResult.selectedHostTarget)
+				if verbose {
+					logger.Printf("Host selected for SSH: %s. Proceeding with connection...\n", tuiResult.selectedHostTarget)
+				}
 				errTUI = connectToHostFromTUI(srv, appCtx, logger, tuiResult.selectedHostTarget, sshUser, sshKeyPath, insecureHostKey, currentUser, verbose)
-				if errTUI != nil {
-					fmt.Fprintf(os.Stderr, "SSH connection from TUI failed or was cancelled: %v\n", errTUI)
+				if errTUI != nil && verbose {
 					logger.Printf("SSH connection from TUI failed or was cancelled: %v", errTUI)
 				}
-			} else {
+			} else if verbose {
 				logger.Println("No host selected for SSH or action cancelled.")
 			}
 		case "scp":
 			if tuiResult.selectedHostTarget != "" {
-				logger.Printf("Host selected for SCP: %s. Local: %s, Remote: %s, Upload: %t\n",
-					tuiResult.selectedHostTarget, tuiResult.scpLocalPath, tuiResult.scpRemotePath, tuiResult.scpIsUpload)
+				if verbose {
+					logger.Printf("Host selected for SCP: %s. Local: %s, Remote: %s, Upload: %t\n",
+						tuiResult.selectedHostTarget, tuiResult.scpLocalPath, tuiResult.scpRemotePath, tuiResult.scpIsUpload)
+				}
 				
 				effectiveScpUser := sshUser // User from -l flag is default
 				if tuiResult.selectedHostTarget != "" { // If a host was selected
@@ -204,18 +215,18 @@ func main() {
 				}
 
 				errTUI = performSCPTransfer(srv, appCtx, logger, tuiResult, effectiveScpUser, sshKeyPath, insecureHostKey, currentUser, verbose)
-				if errTUI != nil {
-					fmt.Fprintf(os.Stderr, "SCP transfer from TUI failed: %v\n", errTUI)
+				if errTUI != nil && verbose {
 					logger.Printf("SCP transfer from TUI failed: %v", errTUI)
-				} else {
-					fmt.Fprintln(os.Stderr, "SCP transfer from TUI completed successfully.")
+				} else if verbose {
 					logger.Println("SCP transfer from TUI completed successfully.")
 				}
-			} else {
+			} else if verbose {
 				logger.Println("SCP action cancelled or host not selected.")
 			}
 		default:
-			logger.Println("No action selected from TUI or TUI exited.")
+			if verbose {
+				logger.Println("No action selected from TUI or TUI exited.")
+			}
 		}
 		os.Exit(0)
 	}
@@ -269,7 +280,7 @@ func main() {
 
 	if detectedScpArgs != nil {
 		// SCP mode is active.
-		srv, ctx, _, err := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose)
+		srv, ctx, _, err := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose, false)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize Tailscale connection for SCP: %v\n", err)
 			os.Exit(1)
@@ -317,7 +328,7 @@ func main() {
 			logger.Printf("Starting %s (SSH mode)...", clientName)
 		}
 
-		srv, ctx, _, err := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose)
+		srv, ctx, _, err := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose, false)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to initialize Tailscale connection for SSH: %v\n", err)
 			os.Exit(1)
@@ -542,4 +553,4 @@ func main() {
 }
 
 // Moved to tsnet_handler.go:
-// func initTsNet(...) (*tsnet.Server, context.Context, *ipnstate.Status, error)
+// func initTsNet(tsnetDir, clientHostname string, logger *log.Logger, tsControlURL string, verbose, tuiMode bool) (*tsnet.Server, context.Context, *ipnstate.Status, error)
