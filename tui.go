@@ -206,8 +206,8 @@ func startTUI(app *tview.Application, srv *tsnet.Server, appCtx context.Context,
 
 	// Add pages to the page manager
 	pages.AddPage("hostSelection", tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(hostList, 0, 1, true). // hostList takes up most space, has focus
-		AddItem(infoBox, 1, 0, false), // infoBox is small, no focus
+		AddItem(hostList, 0, 10, true). // hostList takes up most space, has focus
+		AddItem(infoBox, 0, 1, false), // infoBox gets small proportion for better fit
 		true, true) // Resizable, visible
 	pages.AddPage("actionChoice", actionList, true, false) // Initially not visible
 	pages.AddPage("scpForm", scpForm, true, false)         // Initially not visible
