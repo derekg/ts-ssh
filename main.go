@@ -150,6 +150,7 @@ func main() {
 		app := tview.NewApplication()
 		// For TUI mode, always use a discarded logger to prevent output interference
 		tuiLogger := log.New(io.Discard, "", 0)
+		
 		srv, ctx, initialStatus, errTUI := initTsNet(tsnetDir, clientName, tuiLogger, tsControlURL, verbose, true)
 		if errTUI != nil {
 			os.Exit(1) 
@@ -172,7 +173,20 @@ func main() {
 			}
 		}()
 
+		// Redirect stderr during TUI to prevent background library output
+		originalStderr := os.Stderr
+		devNull, devNullErr := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+		if devNullErr == nil {
+			os.Stderr = devNull
+		}
+		
 		tuiResult, errTUI := startTUI(app, srv, appCtx, tuiLogger, initialStatus, sshUser, sshKeyPath, insecureHostKey, verbose)
+		
+		// Restore stderr immediately after TUI exits
+		if devNullErr == nil {
+			devNull.Close()
+			os.Stderr = originalStderr
+		}
 		if errTUI != nil {
 			if verbose {
 				logger.Fatalf("TUI error: %v", errTUI)

@@ -1,0 +1,3 @@
+2025/06/16 15:05:38 tsnet running state path /home/derek/.config/ts-ssh-client/tailscaled.state
+2025/06/16 15:05:38 tsnet starting with hostname "ts-ssh-client", varRoot "/home/derek/.config/ts-ssh-client"
+2025/06/16 15:05:43 AuthLoop: state is Starting; done
