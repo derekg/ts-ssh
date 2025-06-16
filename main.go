@@ -134,15 +134,18 @@ func main() {
 	}
 	flag.Parse()
 
-	// If TUI mode is detected, redirect stderr immediately before any goroutines start
-	var originalStderr *os.File
+	// If TUI mode is detected, redirect stderr at file descriptor level before any goroutines start
+	var originalStderrFd int
 	var stderrDevNull *os.File
 	if tuiMode {
-		originalStderr = os.Stderr
+		// Save original stderr file descriptor
+		originalStderrFd, _ = syscall.Dup(int(os.Stderr.Fd()))
+		
+		// Open /dev/null and redirect stderr file descriptor to it
 		var err error
 		stderrDevNull, err = os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 		if err == nil {
-			os.Stderr = stderrDevNull
+			syscall.Dup2(int(stderrDevNull.Fd()), int(os.Stderr.Fd()))
 		}
 	}
 
@@ -187,10 +190,11 @@ func main() {
 
 		tuiResult, errTUI := startTUI(app, srv, appCtx, tuiLogger, initialStatus, sshUser, sshKeyPath, insecureHostKey, verbose)
 		
-		// Restore stderr after TUI operations complete
+		// Restore stderr file descriptor after TUI operations complete
 		if stderrDevNull != nil {
 			stderrDevNull.Close()
-			os.Stderr = originalStderr
+			syscall.Dup2(originalStderrFd, int(os.Stderr.Fd()))
+			syscall.Close(originalStderrFd)
 		}
 		if errTUI != nil {
 			if verbose {
