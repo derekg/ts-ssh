@@ -127,30 +127,48 @@ func main() {
 	flag.BoolVar(&pickHost, "pick", false, T("flag_pick_desc"))
 	flag.BoolVar(&parallel, "parallel", false, T("flag_parallel_desc"))
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, T("usage_header")+"\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, T("usage_list")+"\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, T("usage_multi")+"\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, T("usage_exec")+"\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, T("usage_copy")+"\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, T("usage_pick")+"\n\n", os.Args[0])
+		// Parse args to get language flag before displaying help
+		// This is a bit hacky but necessary for dynamic language in help
+		tempLang := ""
+		for i, arg := range os.Args[1:] {
+			if arg == "--lang" && i+1 < len(os.Args[1:]) {
+				tempLang = os.Args[i+2]
+				break
+			} else if strings.HasPrefix(arg, "--lang=") {
+				tempLang = strings.SplitN(arg, "=", 2)[1]
+				break
+			}
+		}
+		
+		// Temporarily reinitialize i18n for help display
+		if tempLang != "" {
+			initI18n(tempLang)
+		}
+		
+		fmt.Fprintf(os.Stderr, T("usage_header", os.Args[0])+"\n")
+		fmt.Fprintf(os.Stderr, T("usage_list", os.Args[0])+"\n")
+		fmt.Fprintf(os.Stderr, T("usage_multi", os.Args[0])+"\n")
+		fmt.Fprintf(os.Stderr, T("usage_exec", os.Args[0])+"\n")
+		fmt.Fprintf(os.Stderr, T("usage_copy", os.Args[0])+"\n")
+		fmt.Fprintf(os.Stderr, T("usage_pick", os.Args[0])+"\n\n")
 		fmt.Fprintf(os.Stderr, T("usage_description")+"\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, T("examples_header")+"\n")
 		fmt.Fprintf(os.Stderr, T("examples_basic_ssh")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_interactive")+"\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, T("examples_remote_cmd")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_interactive", os.Args[0])+"\n")
+		fmt.Fprintf(os.Stderr, T("examples_remote_cmd", os.Args[0])+"\n")
 		fmt.Fprintf(os.Stderr, T("examples_host_discovery")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_list_hosts")+"\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, T("examples_pick_host")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_list_hosts", os.Args[0])+"\n")
+		fmt.Fprintf(os.Stderr, T("examples_pick_host", os.Args[0])+"\n")
 		fmt.Fprintf(os.Stderr, T("examples_multi_host")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_tmux")+"\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, T("examples_exec_multi")+"\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, T("examples_parallel")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_tmux", os.Args[0])+"\n")
+		fmt.Fprintf(os.Stderr, T("examples_exec_multi", os.Args[0])+"\n")
+		fmt.Fprintf(os.Stderr, T("examples_parallel", os.Args[0])+"\n")
 		fmt.Fprintf(os.Stderr, T("examples_file_transfer")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_scp_single")+"\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, T("examples_scp_multi")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_scp_single", os.Args[0])+"\n")
+		fmt.Fprintf(os.Stderr, T("examples_scp_multi", os.Args[0])+"\n")
 		fmt.Fprintf(os.Stderr, T("examples_proxy")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_proxy_cmd")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_proxy_cmd", os.Args[0])+"\n")
 	}
 	flag.Parse()
 

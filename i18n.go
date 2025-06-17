@@ -18,6 +18,9 @@ var (
 	// Global printer for internationalization
 	printer *message.Printer
 	
+	// Flag to track if messages have been registered
+	messagesRegistered = false
+	
 	// Available languages
 	supportedLanguages = map[string]language.Tag{
 		LangEnglish: language.English,
@@ -27,6 +30,12 @@ var (
 
 // initI18n initializes the internationalization system
 func initI18n(langFlag string) {
+	// Register messages only once
+	if !messagesRegistered {
+		registerMessages()
+		messagesRegistered = true
+	}
+	
 	// Determine language preference: CLI flag > env var > default
 	lang := determineLang(langFlag)
 	
@@ -38,23 +47,30 @@ func initI18n(langFlag string) {
 	
 	// Create printer for the selected language
 	printer = message.NewPrinter(tag)
-	
-	// Register all message translations
-	registerMessages()
 }
 
 // determineLang determines which language to use based on priority:
 // 1. CLI flag (--lang)
 // 2. Environment variable (TS_SSH_LANG)
-// 3. Default (English)
+// 3. Standard locale environment variables (LC_ALL, LANG)
+// 4. Default (English)
 func determineLang(langFlag string) string {
 	// Check CLI flag first
 	if langFlag != "" {
 		return normalizeLanguage(langFlag)
 	}
 	
-	// Check environment variable
+	// Check custom environment variable
 	if envLang := os.Getenv("TS_SSH_LANG"); envLang != "" {
+		return normalizeLanguage(envLang)
+	}
+	
+	// Check standard locale environment variables
+	if envLang := os.Getenv("LC_ALL"); envLang != "" {
+		return normalizeLanguage(envLang)
+	}
+	
+	if envLang := os.Getenv("LANG"); envLang != "" {
 		return normalizeLanguage(envLang)
 	}
 	
@@ -337,8 +353,7 @@ func registerMessages() {
 func T(key string, args ...interface{}) string {
 	if printer == nil {
 		// Fallback to English if not initialized
-		printer = message.NewPrinter(language.English)
-		registerMessages()
+		initI18n("")
 	}
 	return printer.Sprintf(key, args...)
 }
