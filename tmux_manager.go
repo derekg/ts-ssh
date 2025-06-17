@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"golang.org/x/term"
 )
 
 // TmuxManager handles creating and managing tmux sessions for SSH connections
@@ -227,6 +229,15 @@ func (tm *TmuxManager) displayWelcomeMessage() {
 // attachToSession attaches to the tmux session (this will block until detached)
 func (tm *TmuxManager) attachToSession() error {
 	tm.logger.Printf("Attaching to tmux session '%s'", tm.sessionName)
+	
+	// Check if we're in a terminal environment
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		tm.logger.Printf("Not running in a terminal, cannot attach to tmux session")
+		fmt.Printf("Tmux session '%s' created successfully!\n", tm.sessionName)
+		fmt.Printf("To connect manually, run: tmux attach-session -t %s\n", tm.sessionName)
+		fmt.Printf("Or list sessions with: tmux list-sessions\n")
+		return nil
+	}
 	
 	// Attach to session - this will transfer control to tmux
 	cmd := exec.Command("tmux", "attach-session", "-t", tm.sessionName)

@@ -10,7 +10,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/exec"
 	"os/signal"
 	"os/user"
 	"path/filepath"
@@ -21,8 +20,6 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 	"golang.org/x/term"
-
-	"github.com/rivo/tview"
 )
 
 // scpArgs holds parsed arguments for an SCP operation.
@@ -34,16 +31,6 @@ type scpArgs struct {
 	sshUser    string // User from user@host:path, if present
 }
 
-// tuiActionResult defines what action the user selected in the TUI.
-type tuiActionResult struct {
-	action             string   // "ssh", "scp", "multi-session", or "" if exited/cancelled
-	selectedHostTarget string   // Hostname or IP for single connection
-	selectedHosts      []string // Multiple hostnames for multi-session mode
-	// SCP specific fields
-	scpLocalPath  string
-	scpRemotePath string
-	scpIsUpload   bool // true for upload (local to remote), false for download (remote to local)
-}
 
 // version is set at build time via -ldflags "-X main.version=..."; default is "dev".
 var version = "dev"
@@ -93,8 +80,13 @@ func main() {
 		insecureHostKey bool
 		forwardDest     string
 		showVersion     bool
-		tuiMode         bool
-		testTmux        bool
+		// Power CLI features
+		listHosts       bool
+		multiHosts      string
+		execCmd         string
+		copyFiles       string
+		pickHost        bool
+		parallel        bool
 	)
 
 	currentUser, err := user.Current()
@@ -119,39 +111,42 @@ func main() {
 	flag.BoolVar(&insecureHostKey, "insecure", false, "Disable host key checking (INSECURE!)")
 	flag.StringVar(&forwardDest, "W", "", "forward stdio to destination host:port (for use as ProxyCommand)")
 	flag.BoolVar(&showVersion, "version", false, "Print version and exit")
-	flag.BoolVar(&tuiMode, "tui", false, "Enable interactive TUI mode")
-	flag.BoolVar(&testTmux, "test-tmux", false, "Test tmux manager functionality")
+	
+	// Power CLI features
+	flag.BoolVar(&listHosts, "list", false, "List available Tailscale hosts")
+	flag.StringVar(&multiHosts, "multi", "", "Start tmux session with multiple hosts (comma-separated)")
+	flag.StringVar(&execCmd, "exec", "", "Execute command on specified hosts")
+	flag.StringVar(&copyFiles, "copy", "", "Copy files to multiple hosts (format: localfile host1,host2:/path/)")
+	flag.BoolVar(&pickHost, "pick", false, "Interactive host picker (simple selection)")
+	flag.BoolVar(&parallel, "parallel", false, "Execute commands in parallel (use with --exec)")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] [user@]hostname[:port] [command...]\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "       %s [options] local_path user@hostname:remote_path\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "       %s [options] user@hostname:remote_path local_path\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Connects to a host on your Tailscale network via SSH or SCP using tsnet.\n\nOptions:\n")
+		fmt.Fprintf(os.Stderr, "       %s --list                                    # List available hosts\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "       %s --multi host1,host2,host3                # Multi-host tmux session\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "       %s --exec \"command\" host1,host2             # Run command on multiple hosts\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "       %s --copy file.txt host1,host2:/tmp/        # Copy file to multiple hosts\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "       %s --pick                                   # Interactive host picker\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Powerful SSH/SCP tool for Tailscale networks.\n\nOptions:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  %s user@host           # interactive SSH session\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s user@host ls -lah    # run a remote command non-interactively\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s local.txt user@host:/remote/ # SCP upload\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s user@host:/remote/file.txt ./ # SCP download\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -W host:port        # proxy stdio to host:port via Tailscale (for ProxyCommand)\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  scp -o ProxyCommand=\"%s -W %%h:%%p user@gateway\" localfile remote:/path\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -version           # print version and exit\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  Basic SSH:\n")
+		fmt.Fprintf(os.Stderr, "    %s user@host                    # Interactive SSH session\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "    %s user@host ls -lah            # Run remote command\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\n  Host Discovery:\n")
+		fmt.Fprintf(os.Stderr, "    %s --list                       # Show all Tailscale hosts\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "    %s --pick                       # Pick host interactively\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\n  Multi-Host Operations:\n")
+		fmt.Fprintf(os.Stderr, "    %s --multi web1,web2,db1        # Tmux session with 3 hosts\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "    %s --exec \"uptime\" web1,web2    # Run command on 2 hosts\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "    %s --parallel --exec \"ps aux\" web1,web2  # Parallel execution\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\n  File Transfer:\n")
+		fmt.Fprintf(os.Stderr, "    %s local.txt user@host:/remote/ # Single SCP upload\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "    %s --copy deploy.sh web1,web2:/tmp/  # Multi-host SCP\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\n  ProxyCommand:\n")
+		fmt.Fprintf(os.Stderr, "    %s -W host:port                 # Proxy stdio via Tailscale\n", os.Args[0])
 	}
 	flag.Parse()
 
-	// If TUI mode is detected, redirect stderr at file descriptor level before any goroutines start
-	var originalStderrFd int
-	var stderrDevNull *os.File
-	if tuiMode {
-		// Save original stderr file descriptor
-		originalStderrFd, _ = syscall.Dup(int(os.Stderr.Fd()))
-		
-		// Open /dev/null and redirect stderr file descriptor to it
-		var err error
-		stderrDevNull, err = os.OpenFile(os.DevNull, os.O_WRONLY, 0)
-		if err == nil {
-			syscall.Dup2(int(stderrDevNull.Fd()), int(os.Stderr.Fd()))
-		}
-	}
 
 	var logger *log.Logger
 	if verbose {
@@ -165,205 +160,31 @@ func main() {
 		os.Exit(0)
 	}
 
-	if testTmux {
-		testHosts := []string{"example1.host", "example2.host"}
-		fmt.Printf("Testing tmux manager with mock hosts: %v\n", testHosts)
-		
-		tmuxManager := NewTmuxManager(logger, sshUser, sshKeyPath, insecureHostKey)
-		
-		// Test if tmux is available
-		if !tmuxManager.isTmuxAvailable() {
-			fmt.Printf("ERROR: tmux is not installed or not available in PATH\n")
-			os.Exit(1)
-		}
-		fmt.Printf("✓ tmux is available\n")
-		
-		// Test session name generation
-		fmt.Printf("✓ Generated session name: %s\n", tmuxManager.sessionName)
-		
-		// Test SSH command building
-		for _, host := range testHosts {
-			sshCmd := tmuxManager.buildSSHCommand(host)
-			fmt.Printf("✓ SSH command for %s: %s\n", host, sshCmd)
-		}
-		
-		// Test tmux session creation (dry run - create session but don't attach)
-		fmt.Printf("Testing tmux session creation (will not attach)...\n")
-		
-		// Kill any existing session
-		tmuxManager.killExistingSession()
-		
-		// Create initial session without attaching
-		firstHost := testHosts[0]
-		err := tmuxManager.createInitialSessionDryRun(firstHost)
+	// Handle power CLI features
+	if listHosts || pickHost || multiHosts != "" || execCmd != "" || copyFiles != "" {
+		srv, ctx, status, err := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose, false)
 		if err != nil {
-			fmt.Printf("ERROR creating initial session: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to initialize Tailscale connection: %v\n", err)
 			os.Exit(1)
-		}
-		fmt.Printf("✓ Initial tmux session created successfully\n")
-		
-		// Add additional windows
-		for i, host := range testHosts[1:] {
-			windowName := fmt.Sprintf("ssh-%d", i+2)
-			err := tmuxManager.addWindow(windowName, host)
-			if err != nil {
-				fmt.Printf("WARNING: failed to add window for %s: %v\n", host, err)
-			} else {
-				fmt.Printf("✓ Added window %s for %s\n", windowName, host)
-			}
-		}
-		
-		// Configure tmux
-		tmuxManager.configureTmux()
-		fmt.Printf("✓ Tmux configuration applied\n")
-		
-		// List tmux sessions to verify
-		fmt.Printf("Current tmux sessions:\n")
-		listCmd := exec.Command("tmux", "list-sessions")
-		if output, err := listCmd.Output(); err == nil {
-			fmt.Printf("%s\n", string(output))
-		} else {
-			fmt.Printf("No tmux sessions or error listing: %v\n", err)
-		}
-		
-		// Clean up test session
-		fmt.Printf("Cleaning up test session...\n")
-		tmuxManager.CleanupSession()
-		fmt.Printf("✓ Test completed successfully!\n")
-		
-		os.Exit(0)
-	}
-
-	if tuiMode {
-		app := tview.NewApplication()
-		// For TUI mode, always use a discarded logger to prevent output interference
-		tuiLogger := log.New(io.Discard, "", 0)
-		
-		srv, ctx, initialStatus, errTUI := initTsNet(tsnetDir, clientName, tuiLogger, tsControlURL, verbose, true)
-		if errTUI != nil {
-			os.Exit(1) 
 		}
 		defer srv.Close()
-		
-		// Check SSH key availability (will fallback to password if needed)
-		_, keyErr := LoadPrivateKey(sshKeyPath, tuiLogger)
-		if keyErr != nil && verbose {
-			logger.Printf("Note: SSH key not found at %s. Will use password authentication if needed.", sshKeyPath)
+
+		if listHosts {
+			err = handleListHosts(status, verbose)
+		} else if pickHost {
+			err = handlePickHost(srv, ctx, status, logger, sshUser, sshKeyPath, insecureHostKey, currentUser, verbose)
+		} else if multiHosts != "" {
+			err = handleMultiHosts(multiHosts, logger, sshUser, sshKeyPath, insecureHostKey)
+		} else if execCmd != "" {
+			hosts := parseHostList(flag.Args())
+			err = handleExecCommand(srv, ctx, execCmd, hosts, logger, sshUser, sshKeyPath, insecureHostKey, parallel, verbose)
+		} else if copyFiles != "" {
+			err = handleCopyFiles(srv, ctx, copyFiles, logger, sshUser, sshKeyPath, insecureHostKey, verbose)
 		}
 
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-		appCtx, cancelApp := context.WithCancel(ctx)
-		defer cancelApp()
-
-		go func() {
-			select {
-			case <-sigCh:
-				logger.Println("Signal received, initiating TUI shutdown...")
-				cancelApp()
-			case <-ctx.Done(): 
-				logger.Println("Main context cancelled, initiating TUI shutdown...")
-				cancelApp()
-			}
-		}()
-
-		tuiResult, errTUI := startTUI(app, srv, appCtx, tuiLogger, initialStatus, sshUser, sshKeyPath, insecureHostKey, verbose)
-		logger.Printf("TUI returned - Action: '%s', Selected hosts: %v, Error: %v", tuiResult.action, tuiResult.selectedHosts, errTUI)
-		
-		// Restore stderr file descriptor after TUI operations complete
-		if stderrDevNull != nil {
-			stderrDevNull.Close()
-			syscall.Dup2(originalStderrFd, int(os.Stderr.Fd()))
-			syscall.Close(originalStderrFd)
-		}
-		if errTUI != nil {
-			if verbose {
-				logger.Fatalf("TUI error: %v", errTUI)
-			} else {
-				os.Exit(1)
-			}
-		}
-		if verbose {
-			logger.Println("TUI finished.")
-		}
-
-		switch tuiResult.action {
-		case "ssh":
-			if tuiResult.selectedHostTarget != "" {
-				if verbose {
-					logger.Printf("Host selected for SSH: %s. Proceeding with connection...\n", tuiResult.selectedHostTarget)
-				}
-				errTUI = connectToHostFromTUI(srv, appCtx, logger, tuiResult.selectedHostTarget, sshUser, sshKeyPath, insecureHostKey, currentUser, verbose)
-				if errTUI != nil && verbose {
-					logger.Printf("SSH connection from TUI failed or was cancelled: %v", errTUI)
-				}
-			} else if verbose {
-				logger.Println("No host selected for SSH or action cancelled.")
-			}
-		case "scp":
-			if tuiResult.selectedHostTarget != "" {
-				if verbose {
-					logger.Printf("Host selected for SCP: %s. Local: %s, Remote: %s, Upload: %t\n",
-						tuiResult.selectedHostTarget, tuiResult.scpLocalPath, tuiResult.scpRemotePath, tuiResult.scpIsUpload)
-				}
-				
-				effectiveScpUser := sshUser // User from -l flag is default
-				if tuiResult.selectedHostTarget != "" { // If a host was selected
-				    // Attempt to parse user from host string, if any
-				    // This logic assumes selectedHostTarget might contain user@ like "user@actualhost"
-				    // For TUI, selectedHostTarget is typically just the hostname/IP.
-				    // If user can be part of selectedHostTarget from TUI, parse it.
-				    // Otherwise, effectiveScpUser remains the one from -l flag.
-				    // This example assumes selectedHostTarget is just host, not user@host for TUI.
-				}
-
-				errTUI = performSCPTransfer(srv, appCtx, logger, tuiResult, effectiveScpUser, sshKeyPath, insecureHostKey, currentUser, verbose)
-				if errTUI != nil && verbose {
-					logger.Printf("SCP transfer from TUI failed: %v", errTUI)
-				} else if verbose {
-					logger.Println("SCP transfer from TUI completed successfully.")
-				}
-			} else if verbose {
-				logger.Println("SCP action cancelled or host not selected.")
-			}
-		case "multi-session":
-			logger.Printf("Processing multi-session action. Selected hosts: %v", tuiResult.selectedHosts)
-			if len(tuiResult.selectedHosts) > 0 {
-				if verbose {
-					logger.Printf("Starting tmux multi-session mode with %d hosts: %v", len(tuiResult.selectedHosts), tuiResult.selectedHosts)
-				}
-				
-				// Create tmux manager
-				tmuxManager := NewTmuxManager(logger, sshUser, sshKeyPath, insecureHostKey)
-				
-				// Start tmux session with all selected hosts
-				errTUI = tmuxManager.StartMultiSession(tuiResult.selectedHosts)
-				if errTUI != nil {
-					logger.Printf("Failed to start tmux session: %v", errTUI)
-					// Fallback: show what command user can run manually
-					fmt.Fprintf(os.Stderr, "\nTmux session failed. You can manually connect to hosts:\n")
-					for i, host := range tuiResult.selectedHosts {
-						fmt.Fprintf(os.Stderr, "  %d. %s %s@%s\n", i+1, os.Args[0], sshUser, host)
-					}
-				} else {
-					if verbose {
-						logger.Printf("Tmux session ended normally")
-					}
-				}
-				
-				// Clean up tmux session
-				tmuxManager.CleanupSession()
-				
-			} else {
-				logger.Printf("Multi-session action but no hosts selected. selectedHosts length: %d", len(tuiResult.selectedHosts))
-				if verbose {
-					logger.Println("Multi-session action cancelled or no hosts selected.")
-				}
-			}
-		default:
-			if verbose {
-				logger.Println("No action selected from TUI or TUI exited.")
-			}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
 		}
 		os.Exit(0)
 	}
@@ -376,7 +197,7 @@ func main() {
 	// It will be overridden if user@host is specified in the remote path.
 	defaultScpUser := sshUser 
 
-	if !tuiMode && len(nonFlagArgs) == 2 {
+	if len(nonFlagArgs) == 2 {
 		arg1 := nonFlagArgs[0]
 		arg2 := nonFlagArgs[1]
 
@@ -436,257 +257,255 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Fallthrough to SSH logic if not TUI and not SCP
-	if !tuiMode { 
-		if flag.NArg() < 1 { 
-			flag.Usage()
+	// Fallthrough to SSH logic if not SCP 
+	if flag.NArg() < 1 { 
+		flag.Usage()
+		os.Exit(1)
+	}
+	target = flag.Arg(0)
+	var remoteCmd []string
+	if flag.NArg() > 1 {
+		remoteCmd = flag.Args()[1:]
+	}
+
+	targetHost, targetPort, err := parseTarget(target, DefaultSshPort)
+	if err != nil {
+		logger.Fatalf("Error parsing target for SSH: %v", err)
+	}
+	
+	sshSpecificUser := sshUser 
+	if strings.Contains(targetHost, "@") { 
+		parts := strings.SplitN(targetHost, "@", 2)
+		sshSpecificUser = parts[0]
+		targetHost = parts[1] 
+		if verbose { logger.Printf("SSH target user overridden to '%s' from target string.", sshSpecificUser) }
+	}
+	
+	if verbose {
+		logger.Printf("Starting %s (SSH mode)...", clientName)
+	}
+
+	srv, ctx, _, err := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose, false)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize Tailscale connection for SSH: %v\n", err)
+		os.Exit(1)
+	}
+	defer srv.Close()
+
+	nonTuiCtx, nonTuiCancel := context.WithCancel(ctx)
+	defer nonTuiCancel()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		select {
+		case <-sigCh:
+			logger.Println("Signal received, shutting down non-TUI operation...")
+			nonTuiCancel()
+			fd := int(os.Stdin.Fd())
+			if term.IsTerminal(fd) {
+				_ = term.Restore(fd, nil)
+			}
 			os.Exit(1)
+		case <-ctx.Done():
+			logger.Println("Main tsnet context cancelled, shutting down non-TUI operation...")
+			nonTuiCancel()
 		}
-		target = flag.Arg(0)
-		var remoteCmd []string
-		if flag.NArg() > 1 {
-			remoteCmd = flag.Args()[1:]
-		}
+	}()
 
-		targetHost, targetPort, err := parseTarget(target, DefaultSshPort)
-		if err != nil {
-			logger.Fatalf("Error parsing target for SSH: %v", err)
+	if forwardDest != "" {
+		logger.Printf("Forwarding stdio to %s via tsnet...", forwardDest)
+		fwdConn, errDial := srv.Dial(nonTuiCtx, "tcp", forwardDest)
+		if errDial != nil {
+			log.Fatalf("Failed to dial %s via tsnet for forwarding: %v", forwardDest, errDial)
 		}
-		
-		sshSpecificUser := sshUser 
-		if strings.Contains(targetHost, "@") { 
-			parts := strings.SplitN(targetHost, "@", 2)
-			sshSpecificUser = parts[0]
-			targetHost = parts[1] 
-			if verbose { logger.Printf("SSH target user overridden to '%s' from target string.", sshSpecificUser) }
-		}
-		
-		if verbose {
-			logger.Printf("Starting %s (SSH mode)...", clientName)
-		}
-
-		srv, ctx, _, err := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose, false)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize Tailscale connection for SSH: %v\n", err)
-			os.Exit(1)
-		}
-		defer srv.Close()
-
-		nonTuiCtx, nonTuiCancel := context.WithCancel(ctx)
-		defer nonTuiCancel()
-
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		go func() {
-			select {
-			case <-sigCh:
-				logger.Println("Signal received, shutting down non-TUI operation...")
-				nonTuiCancel()
-				fd := int(os.Stdin.Fd())
-				if term.IsTerminal(fd) {
-					_ = term.Restore(fd, nil)
-				}
-				os.Exit(1)
-			case <-ctx.Done():
-				logger.Println("Main tsnet context cancelled, shutting down non-TUI operation...")
-				nonTuiCancel()
-			}
+			_, _ = io.Copy(fwdConn, os.Stdin)
+			fwdConn.Close()
 		}()
+		_, _ = io.Copy(os.Stdout, fwdConn)
+		os.Exit(0)
+	}
+	logger.Printf("tsnet potentially initialized. Attempting SSH connection to %s@%s:%s", sshSpecificUser, targetHost, targetPort)
 
-		if forwardDest != "" {
-			logger.Printf("Forwarding stdio to %s via tsnet...", forwardDest)
-			fwdConn, errDial := srv.Dial(nonTuiCtx, "tcp", forwardDest)
-			if errDial != nil {
-				log.Fatalf("Failed to dial %s via tsnet for forwarding: %v", forwardDest, errDial)
-			}
-			go func() {
-				_, _ = io.Copy(fwdConn, os.Stdin)
-				fwdConn.Close()
-			}()
-			_, _ = io.Copy(os.Stdout, fwdConn)
-			os.Exit(0)
+	authMethods := []ssh.AuthMethod{}
+	keyAuth, err := LoadPrivateKey(sshKeyPath, logger)
+	if err == nil {
+		authMethods = append(authMethods, keyAuth)
+		logger.Printf("Using public key authentication: %s", sshKeyPath)
+	} else {
+		logger.Printf("Failed to load private key: %v. Will attempt password auth.", err)
+	}
+	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
+		fmt.Printf("Enter password for %s@%s: ", sshSpecificUser, targetHost)
+		bytePassword, errRead := term.ReadPassword(int(syscall.Stdin))
+		fmt.Println()
+		if errRead != nil {
+			return "", fmt.Errorf("failed to read password: %w", errRead)
 		}
-		logger.Printf("tsnet potentially initialized. Attempting SSH connection to %s@%s:%s", sshSpecificUser, targetHost, targetPort)
+		return string(bytePassword), nil
+	}))
 
-		authMethods := []ssh.AuthMethod{}
-		keyAuth, err := LoadPrivateKey(sshKeyPath, logger)
-		if err == nil {
-			authMethods = append(authMethods, keyAuth)
-			logger.Printf("Using public key authentication: %s", sshKeyPath)
-		} else {
-			logger.Printf("Failed to load private key: %v. Will attempt password auth.", err)
-		}
-		authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-			fmt.Printf("Enter password for %s@%s: ", sshSpecificUser, targetHost)
-			bytePassword, errRead := term.ReadPassword(int(syscall.Stdin))
-			fmt.Println()
-			if errRead != nil {
-				return "", fmt.Errorf("failed to read password: %w", errRead)
-			}
-			return string(bytePassword), nil
-		}))
-
-		var hostKeyCallback ssh.HostKeyCallback
-		if insecureHostKey {
-			logger.Println("WARNING: Host key verification is disabled!")
-			hostKeyCallback = ssh.InsecureIgnoreHostKey()
-		} else {
-			hostKeyCallback, err = CreateKnownHostsCallback(currentUser, logger)
-			if err != nil {
-				log.Fatalf("Could not set up host key verification: %v", err)
-			}
-		}
-
-		sshConfig := &ssh.ClientConfig{
-			User:            sshSpecificUser,
-			Auth:            authMethods,
-			HostKeyCallback: hostKeyCallback,
-			Timeout:         15 * time.Second,
-		}
-
-		sshTargetAddr := net.JoinHostPort(targetHost, targetPort)
-		logger.Printf("Dialing %s via tsnet...", sshTargetAddr)
-		conn, err_dial := srv.Dial(nonTuiCtx, "tcp", sshTargetAddr) // Renamed err to err_dial to avoid conflict
-		if err_dial != nil {
-			log.Fatalf("Failed to dial %s via tsnet (is Tailscale connection up and host reachable?): %v", sshTargetAddr, err_dial)
-		}
-		logger.Printf("tsnet Dial successful. Establishing SSH connection...")
-
-		sshConn, chans, reqs, err_conn := ssh.NewClientConn(conn, sshTargetAddr, sshConfig) // Renamed err to err_conn
-		if err_conn != nil {
-			if strings.Contains(err_conn.Error(), "unable to authenticate") || strings.Contains(err_conn.Error(), "no supported authentication methods") {
-				log.Fatalf("SSH Authentication failed for user %s: %v", sshSpecificUser, err_conn)
-			}
-			var keyErr *knownhosts.KeyError
-			if errors.As(err_conn, &keyErr) {
-				log.Fatalf("SSH Host key verification failed: %v", err_conn)
-			}
-			log.Fatalf("Failed to establish SSH connection to %s: %v", sshTargetAddr, err_conn)
-		}
-		defer sshConn.Close()
-		logger.Println("SSH connection established.")
-
-		client := ssh.NewClient(sshConn, chans, reqs)
-		defer client.Close()
-
-		if len(remoteCmd) > 0 {
-			logger.Printf("Running remote command: %v", remoteCmd)
-			session, errSession := client.NewSession()
-			if errSession != nil {
-				log.Fatalf("Failed to create SSH session for remote command: %v", errSession)
-			}
-			defer session.Close()
-			session.Stdout = os.Stdout
-			session.Stderr = os.Stderr
-			session.Stdin = os.Stdin
-			cmd := strings.Join(remoteCmd, " ")
-			if errRun := session.Run(cmd); errRun != nil {
-				if exitErr, ok := errRun.(*ssh.ExitError); ok {
-					os.Exit(exitErr.ExitStatus())
-				}
-				log.Fatalf("Remote command execution failed: %v", errRun)
-			}
-			os.Exit(0)
-		}
-
-		logger.Println("Starting interactive SSH session...")
-		session, err := client.NewSession()
+	var hostKeyCallback ssh.HostKeyCallback
+	if insecureHostKey {
+		logger.Println("WARNING: Host key verification is disabled!")
+		hostKeyCallback = ssh.InsecureIgnoreHostKey()
+	} else {
+		hostKeyCallback, err = CreateKnownHostsCallback(currentUser, logger)
 		if err != nil {
-			log.Fatalf("Failed to create SSH session: %v", err)
+			log.Fatalf("Could not set up host key verification: %v", err)
+		}
+	}
+
+	sshConfig := &ssh.ClientConfig{
+		User:            sshSpecificUser,
+		Auth:            authMethods,
+		HostKeyCallback: hostKeyCallback,
+		Timeout:         15 * time.Second,
+	}
+
+	sshTargetAddr := net.JoinHostPort(targetHost, targetPort)
+	logger.Printf("Dialing %s via tsnet...", sshTargetAddr)
+	conn, err_dial := srv.Dial(nonTuiCtx, "tcp", sshTargetAddr) // Renamed err to err_dial to avoid conflict
+	if err_dial != nil {
+		log.Fatalf("Failed to dial %s via tsnet (is Tailscale connection up and host reachable?): %v", sshTargetAddr, err_dial)
+	}
+	logger.Printf("tsnet Dial successful. Establishing SSH connection...")
+
+	sshConn, chans, reqs, err_conn := ssh.NewClientConn(conn, sshTargetAddr, sshConfig) // Renamed err to err_conn
+	if err_conn != nil {
+		if strings.Contains(err_conn.Error(), "unable to authenticate") || strings.Contains(err_conn.Error(), "no supported authentication methods") {
+			log.Fatalf("SSH Authentication failed for user %s: %v", sshSpecificUser, err_conn)
+		}
+		var keyErr *knownhosts.KeyError
+		if errors.As(err_conn, &keyErr) {
+			log.Fatalf("SSH Host key verification failed: %v", err_conn)
+		}
+		log.Fatalf("Failed to establish SSH connection to %s: %v", sshTargetAddr, err_conn)
+	}
+	defer sshConn.Close()
+	logger.Println("SSH connection established.")
+
+	client := ssh.NewClient(sshConn, chans, reqs)
+	defer client.Close()
+
+	if len(remoteCmd) > 0 {
+		logger.Printf("Running remote command: %v", remoteCmd)
+		session, errSession := client.NewSession()
+		if errSession != nil {
+			log.Fatalf("Failed to create SSH session for remote command: %v", errSession)
 		}
 		defer session.Close()
-
-		fd := int(os.Stdin.Fd())
-		var oldState *term.State
-		if term.IsTerminal(fd) {
-			oldState, err = term.MakeRaw(fd)
-			if err != nil {
-				log.Printf("Warning: Failed to set terminal to raw mode: %v. Session might not work correctly.", err)
-			} else {
-				defer term.Restore(fd, oldState)
-			}
-		} else {
-			logger.Println("Input is not a terminal, proceeding without raw mode or PTY request.")
-		}
-
-		stdinPipe, err := session.StdinPipe()
-		if err != nil {
-			log.Fatalf("Failed to create stdin pipe for SSH session: %v", err)
-		}
 		session.Stdout = os.Stdout
 		session.Stderr = os.Stderr
-
-		if term.IsTerminal(fd) {
-			termWidth, termHeight, errSize := term.GetSize(fd)
-			if errSize != nil {
-				logger.Printf("Warning: Failed to get terminal size: %v. Using default 80x24.", errSize)
-				termWidth = 80
-				termHeight = 24
-			}
-			termType := os.Getenv("TERM")
-			if termType == "" {
-				termType = "xterm-256color"
-			}
-			errPty := session.RequestPty(termType, termHeight, termWidth, ssh.TerminalModes{})
-			if errPty != nil {
-				log.Fatalf("Failed to request pseudo-terminal: %v", errPty)
-			}
-			go watchWindowSize(fd, session, nonTuiCtx, logger)
-		}
-
-		err = session.Shell()
-		if err != nil {
-			log.Fatalf("Failed to start remote shell: %v", err)
-		}
-		fmt.Fprintf(os.Stderr, "\nEscape sequence: ~. to terminate session\n")
-		go func() {
-			reader := bufio.NewReader(os.Stdin)
-			atLineStart := true
-			for {
-				b, errReadByte := reader.ReadByte()
-				if errReadByte != nil {
-					return
-				}
-				if atLineStart && b == '~' {
-					next, errPeek := reader.Peek(1)
-					if errPeek == nil {
-						if next[0] == '.' {
-							reader.ReadByte()
-							if oldState != nil && term.IsTerminal(fd) {
-								term.Restore(fd, oldState)
-							}
-							os.Exit(0)
-						} else if next[0] == '~' {
-							reader.ReadByte()
-							stdinPipe.Write([]byte{'~'})
-							atLineStart = false
-							continue
-						}
-					}
-				}
-				stdinPipe.Write([]byte{b})
-				atLineStart = (b == '\n' || b == '\r')
-			}
-		}()
-
-		err = session.Wait()
-		if oldState != nil && term.IsTerminal(fd) {
-			term.Restore(fd, oldState)
-		}
-
-		if err != nil {
-			if exitErr, ok := err.(*ssh.ExitError); ok {
-				if verbose {
-					logger.Printf("Remote command exited with status %d", exitErr.ExitStatus())
-				}
+		session.Stdin = os.Stdin
+		cmd := strings.Join(remoteCmd, " ")
+		if errRun := session.Run(cmd); errRun != nil {
+			if exitErr, ok := errRun.(*ssh.ExitError); ok {
 				os.Exit(exitErr.ExitStatus())
 			}
-			if !errors.Is(err, io.EOF) && !strings.Contains(err.Error(), "session closed") && !strings.Contains(err.Error(), "channel closed") {
-				log.Printf("SSH session ended with error: %v", err)
-			}
+			log.Fatalf("Remote command execution failed: %v", errRun)
 		}
-		logger.Println("SSH session closed.")
+		os.Exit(0)
 	}
+
+	logger.Println("Starting interactive SSH session...")
+	session, err := client.NewSession()
+	if err != nil {
+		log.Fatalf("Failed to create SSH session: %v", err)
+	}
+	defer session.Close()
+
+	fd := int(os.Stdin.Fd())
+	var oldState *term.State
+	if term.IsTerminal(fd) {
+		oldState, err = term.MakeRaw(fd)
+		if err != nil {
+			log.Printf("Warning: Failed to set terminal to raw mode: %v. Session might not work correctly.", err)
+		} else {
+			defer term.Restore(fd, oldState)
+		}
+	} else {
+		logger.Println("Input is not a terminal, proceeding without raw mode or PTY request.")
+	}
+
+	stdinPipe, err := session.StdinPipe()
+	if err != nil {
+		log.Fatalf("Failed to create stdin pipe for SSH session: %v", err)
+	}
+	session.Stdout = os.Stdout
+	session.Stderr = os.Stderr
+
+	if term.IsTerminal(fd) {
+		termWidth, termHeight, errSize := term.GetSize(fd)
+		if errSize != nil {
+			logger.Printf("Warning: Failed to get terminal size: %v. Using default 80x24.", errSize)
+			termWidth = 80
+			termHeight = 24
+		}
+		termType := os.Getenv("TERM")
+		if termType == "" {
+			termType = "xterm-256color"
+		}
+		errPty := session.RequestPty(termType, termHeight, termWidth, ssh.TerminalModes{})
+		if errPty != nil {
+			log.Fatalf("Failed to request pseudo-terminal: %v", errPty)
+		}
+		go watchWindowSize(fd, session, nonTuiCtx, logger)
+	}
+
+	err = session.Shell()
+	if err != nil {
+		log.Fatalf("Failed to start remote shell: %v", err)
+	}
+	fmt.Fprintf(os.Stderr, "\nEscape sequence: ~. to terminate session\n")
+	go func() {
+		reader := bufio.NewReader(os.Stdin)
+		atLineStart := true
+		for {
+			b, errReadByte := reader.ReadByte()
+			if errReadByte != nil {
+				return
+			}
+			if atLineStart && b == '~' {
+				next, errPeek := reader.Peek(1)
+				if errPeek == nil {
+					if next[0] == '.' {
+						reader.ReadByte()
+						if oldState != nil && term.IsTerminal(fd) {
+							term.Restore(fd, oldState)
+						}
+						os.Exit(0)
+					} else if next[0] == '~' {
+						reader.ReadByte()
+						stdinPipe.Write([]byte{'~'})
+						atLineStart = false
+						continue
+					}
+				}
+			}
+			stdinPipe.Write([]byte{b})
+			atLineStart = (b == '\n' || b == '\r')
+		}
+	}()
+
+	err = session.Wait()
+	if oldState != nil && term.IsTerminal(fd) {
+		term.Restore(fd, oldState)
+	}
+
+	if err != nil {
+		if exitErr, ok := err.(*ssh.ExitError); ok {
+			if verbose {
+				logger.Printf("Remote command exited with status %d", exitErr.ExitStatus())
+			}
+			os.Exit(exitErr.ExitStatus())
+		}
+		if !errors.Is(err, io.EOF) && !strings.Contains(err.Error(), "session closed") && !strings.Contains(err.Error(), "channel closed") {
+			log.Printf("SSH session ended with error: %v", err)
+		}
+	}
+	logger.Println("SSH session closed.")
 }
 
 // Moved to tsnet_handler.go:
