@@ -225,19 +225,25 @@ func handleCopyFiles(srv *tsnet.Server, ctx context.Context, copyFiles string, l
 	return nil
 }
 
-// executeParallel runs commands on multiple hosts in parallel
+// executeParallel runs commands on multiple hosts in parallel with race condition protection
 func executeParallel(srv *tsnet.Server, ctx context.Context, execCmd string, hosts []string,
 	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, verbose bool) error {
 	
 	var wg sync.WaitGroup
 	results := make(chan string, len(hosts))
+	
+	// Create a mutex to protect against concurrent password prompts
+	var authMutex sync.Mutex
 
 	for _, host := range hosts {
 		wg.Add(1)
 		go func(h string) {
 			defer wg.Done()
 			
-			output, err := executeOnHost(srv, ctx, execCmd, h, logger, sshUser, sshKeyPath, insecureHostKey, verbose)
+			// Create a host-specific logger to avoid concurrent access to shared logger
+			hostLogger := log.New(logger.Writer(), fmt.Sprintf("[%s] ", h), logger.Flags())
+			
+			output, err := executeOnHostSafe(srv, ctx, execCmd, h, hostLogger, sshUser, sshKeyPath, insecureHostKey, verbose, &authMutex)
 			if err != nil {
 				results <- fmt.Sprintf("[%s] ERROR: %v", h, err)
 			} else {
@@ -324,6 +330,97 @@ func executeOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host string,
 	} else {
 		// We don't have currentUser here, so use a simpler approach
 		hostKeyCallback = ssh.InsecureIgnoreHostKey() // For now, will improve later
+	}
+
+	sshConfig := &ssh.ClientConfig{
+		User:            effectiveUser,
+		Auth:            authMethods,
+		HostKeyCallback: hostKeyCallback,
+		Timeout:         DefaultSSHTimeout,
+	}
+
+	// Connect via tsnet
+	sshTargetAddr := net.JoinHostPort(targetHost, targetPort)
+	conn, err := srv.Dial(ctx, "tcp", sshTargetAddr)
+	if err != nil {
+		return "", fmt.Errorf("failed to dial %s via tsnet: %w", sshTargetAddr, err)
+	}
+
+	// Establish SSH connection
+	sshConn, chans, reqs, err := ssh.NewClientConn(conn, sshTargetAddr, sshConfig)
+	if err != nil {
+		conn.Close()
+		return "", fmt.Errorf("failed to establish SSH connection: %w", err)
+	}
+	defer sshConn.Close()
+
+	client := ssh.NewClient(sshConn, chans, reqs)
+	defer client.Close()
+
+	// Create session and run command
+	session, err := client.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("failed to create SSH session: %w", err)
+	}
+	defer session.Close()
+
+	// Capture output
+	output, err := session.CombinedOutput(execCmd)
+	if err != nil {
+		return string(output), fmt.Errorf("command failed: %w", err)
+	}
+
+	return string(output), nil
+}
+
+// executeOnHostSafe executes a command on a single host with thread-safe authentication
+func executeOnHostSafe(srv *tsnet.Server, ctx context.Context, execCmd, host string,
+	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, verbose bool, authMutex *sync.Mutex) (string, error) {
+	
+	// Set up SSH connection similar to main SSH logic
+	targetHost, targetPort, err := parseTarget(host, DefaultSshPort)
+	if err != nil {
+		return "", fmt.Errorf("error parsing target %s: %w", host, err)
+	}
+
+	// Parse user from host if present
+	effectiveUser := sshUser
+	if strings.Contains(targetHost, "@") {
+		parts := strings.SplitN(targetHost, "@", 2)
+		effectiveUser = parts[0]
+		targetHost = parts[1]
+	}
+
+	// Set up SSH authentication
+	authMethods := []ssh.AuthMethod{}
+	if sshKeyPath != "" {
+		keyAuth, keyErr := LoadPrivateKey(sshKeyPath, logger)
+		if keyErr == nil {
+			authMethods = append(authMethods, keyAuth)
+		}
+	}
+
+	// Add password auth with mutex protection to prevent concurrent prompts
+	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
+		authMutex.Lock()
+		defer authMutex.Unlock()
+		
+		fmt.Printf(T("enter_password"), effectiveUser, targetHost)
+		bytePassword, errRead := term.ReadPassword(int(syscall.Stdin))
+		fmt.Println()
+		if errRead != nil {
+			return "", fmt.Errorf("failed to read password: %w", errRead)
+		}
+		return string(bytePassword), nil
+	}))
+
+	// Set up host key callback
+	var hostKeyCallback ssh.HostKeyCallback
+	if insecureHostKey {
+		hostKeyCallback = ssh.InsecureIgnoreHostKey()
+	} else {
+		// Use insecure for parallel execution to avoid concurrent known_hosts access
+		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	}
 
 	sshConfig := &ssh.ClientConfig{

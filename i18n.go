@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"strings"
+	"sync"
 
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
@@ -18,8 +19,9 @@ var (
 	// Global printer for internationalization
 	printer *message.Printer
 	
-	// Flag to track if messages have been registered
-	messagesRegistered = false
+	// Synchronization for thread-safe access
+	initI18nOnce sync.Once
+	printerMu    sync.RWMutex
 	
 	// Available languages
 	supportedLanguages = map[string]language.Tag{
@@ -28,13 +30,12 @@ var (
 	}
 )
 
-// initI18n initializes the internationalization system
+// initI18n initializes the internationalization system thread-safely
 func initI18n(langFlag string) {
-	// Register messages only once
-	if !messagesRegistered {
+	// Ensure messages are registered only once across all goroutines
+	initI18nOnce.Do(func() {
 		registerMessages()
-		messagesRegistered = true
-	}
+	})
 	
 	// Determine language preference: CLI flag > env var > default
 	lang := determineLang(langFlag)
@@ -45,8 +46,10 @@ func initI18n(langFlag string) {
 		tag = language.English // fallback to English
 	}
 	
-	// Create printer for the selected language
+	// Create printer for the selected language with thread-safe access
+	printerMu.Lock()
 	printer = message.NewPrinter(tag)
+	printerMu.Unlock()
 }
 
 // determineLang determines which language to use based on priority:
@@ -349,11 +352,21 @@ func registerMessages() {
 	message.SetString(language.Spanish, "scp_download_complete", "CLI SCP: Descarga completada.")
 }
 
-// T returns a localized string using the global printer
+// T returns a localized string using the global printer thread-safely
 func T(key string, args ...interface{}) string {
-	if printer == nil {
-		// Fallback to English if not initialized
+	// Read printer with read lock for concurrent access
+	printerMu.RLock()
+	p := printer
+	printerMu.RUnlock()
+	
+	// Initialize if not yet done
+	if p == nil {
 		initI18n("")
+		printerMu.RLock()
+		p = printer
+		printerMu.RUnlock()
 	}
-	return printer.Sprintf(key, args...)
+	
+	// Use local copy to avoid holding lock during sprintf
+	return p.Sprintf(key, args...)
 }

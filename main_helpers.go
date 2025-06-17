@@ -7,9 +7,11 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	"os/user"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
@@ -406,17 +408,87 @@ func setupTerminal(session *ssh.Session, fd int, logger *log.Logger) error {
 
 // handleInteractiveSession manages the interactive SSH session with proper terminal handling
 func handleInteractiveSession(session *ssh.Session, stdinPipe io.WriteCloser, fd int, logger *log.Logger) error {
-	// This function will be implemented with the existing terminal handling logic
-	// from the original main function. For now, let's create a placeholder.
+	termState := GetGlobalTerminalState()
 	
-	// TODO: Move the terminal handling, signal processing, and escape sequence
-	// detection logic from the original main function here.
+	// Set up terminal in raw mode if we're in a terminal
+	if term.IsTerminal(fd) {
+		err := termState.MakeRaw(fd)
+		if err != nil {
+			logger.Printf("Warning: Failed to set terminal to raw mode: %v", err)
+		} else {
+			// Ensure terminal is restored on exit
+			defer func() {
+				if err := termState.Restore(); err != nil {
+					logger.Printf("Warning: Failed to restore terminal: %v", err)
+				}
+			}()
+		}
+		
+		fmt.Fprintf(os.Stderr, T("escape_sequence")+"\n")
+	}
 	
-	// For now, just do basic I/O forwarding
-	go func() {
-		defer stdinPipe.Close()
-		_, _ = io.Copy(stdinPipe, os.Stdin)
-	}()
+	// Set up signal handling for graceful shutdown
+	done := make(chan bool, 1)
+	go handleInputWithTerminalState(stdinPipe, done, logger, termState)
 	
-	return session.Wait()
+	// Handle window resize signals if in terminal
+	if term.IsTerminal(fd) {
+		go handleSignalsAndResizeWithTerminalState(session, termState, logger)
+	}
+	
+	// Wait for session to complete
+	err := session.Wait()
+	done <- true // Signal input handler to stop
+	
+	return err
+}
+
+// handleInputWithTerminalState handles stdin input with terminal state awareness
+func handleInputWithTerminalState(stdinPipe io.WriteCloser, done chan bool, logger *log.Logger, termState *TerminalStateManager) {
+	defer stdinPipe.Close()
+	
+	// Create a buffered reader for stdin
+	input := make([]byte, 1024)
+	
+	for {
+		select {
+		case <-done:
+			return
+		default:
+			n, err := os.Stdin.Read(input)
+			if err != nil {
+				if err != io.EOF {
+					logger.Printf("Error reading stdin: %v", err)
+				}
+				return
+			}
+			
+			// Write to SSH session
+			_, writeErr := stdinPipe.Write(input[:n])
+			if writeErr != nil {
+				logger.Printf("Error writing to SSH session: %v", writeErr)
+				return
+			}
+		}
+	}
+}
+
+// handleSignalsAndResizeWithTerminalState handles signals and window resizing with terminal state
+func handleSignalsAndResizeWithTerminalState(session *ssh.Session, termState *TerminalStateManager, logger *log.Logger) {
+	// Set up signal channel for SIGWINCH (window resize)
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGWINCH)
+	
+	for {
+		select {
+		case <-sigCh:
+			if termState.IsRaw() {
+				fd := termState.GetFD()
+				if width, height, err := term.GetSize(fd); err == nil {
+					// Send window size change to remote
+					session.WindowChange(height, width)
+				}
+			}
+		}
+	}
 }
