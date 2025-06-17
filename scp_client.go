@@ -41,7 +41,7 @@ func HandleCliScp(
 		targetHost, sshUser, localPath, remotePath, isUpload, sshKeyPath)
 
 	if localPath == "" || remotePath == "" {
-		return errors.New("local or remote path for SCP cannot be empty")
+		return errors.New(T("scp_empty_path"))
 	}
 
 	// Ensure defaultSSHPort is accessible. For now, define locally if not shared.
@@ -64,7 +64,7 @@ func HandleCliScp(
 	}
 
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		fmt.Printf("Enter password for %s@%s (for SCP): ", sshUser, targetHost)
+		fmt.Printf(T("scp_enter_password"), sshUser, targetHost)
 		bytePassword, passErr := term.ReadPassword(int(syscall.Stdin))
 		fmt.Println()
 		if passErr != nil {
@@ -76,7 +76,7 @@ func HandleCliScp(
 	var hostKeyCallback ssh.HostKeyCallback
 	var hkErr error
 	if insecureHostKey {
-		logger.Println("CLI SCP: WARNING! Host key verification is disabled!")
+		logger.Println(T("scp_host_key_warning"))
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	} else {
 		// Call the exported function from ssh_client.go
@@ -136,7 +136,7 @@ func HandleCliScp(
 		if errCopy != nil {
 			return fmt.Errorf("CLI SCP: error uploading file: %w", errCopy)
 		}
-		logger.Println("CLI SCP: Upload complete.")
+		logger.Println(T("scp_upload_complete"))
 	} else { // Download
 		logger.Printf("CLI SCP: Downloading %s@%s:%s to %s", sshUser, targetHost, remotePath, localPath)
 		
@@ -154,7 +154,7 @@ func HandleCliScp(
 			}
 			return fmt.Errorf("CLI SCP: error downloading file: %w", errCopy)
 		}
-		logger.Println("CLI SCP: Download complete.")
+		logger.Println(T("scp_download_complete"))
 	}
 	return nil
 }

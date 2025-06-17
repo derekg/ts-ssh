@@ -47,7 +47,7 @@ func parseScpRemoteArg(remoteArg string, defaultSshUser string) (host, path, use
 
 	parts := strings.SplitN(remoteArg, ":", 2)
 	if len(parts) != 2 || parts[1] == "" { // Ensure path part exists
-		return "", "", "", fmt.Errorf("invalid remote SCP argument format: %q. Must be [user@]host:path", remoteArg)
+		return "", "", "", fmt.Errorf(T("invalid_scp_remote"), remoteArg)
 	}
 	path = parts[1]
 	hostPart := parts[0]
@@ -55,7 +55,7 @@ func parseScpRemoteArg(remoteArg string, defaultSshUser string) (host, path, use
 	if strings.Contains(hostPart, "@") {
 		userHostParts := strings.SplitN(hostPart, "@", 2)
 		if len(userHostParts) != 2 || userHostParts[0] == "" || userHostParts[1] == "" {
-			return "", "", "", fmt.Errorf("invalid user@host format in SCP argument: %q", hostPart)
+			return "", "", "", fmt.Errorf(T("invalid_user_host"), hostPart)
 		}
 		user = userHostParts[0]
 		host = userHostParts[1]
@@ -64,7 +64,7 @@ func parseScpRemoteArg(remoteArg string, defaultSshUser string) (host, path, use
 	}
 
 	if host == "" {
-		return "", "", "", fmt.Errorf("host cannot be empty in SCP argument: %q", remoteArg)
+		return "", "", "", fmt.Errorf(T("empty_host_scp"), remoteArg)
 	}
 	return host, path, user, nil
 }
@@ -81,6 +81,7 @@ func main() {
 		insecureHostKey bool
 		forwardDest     string
 		showVersion     bool
+		langFlag        string
 		// Power CLI features
 		listHosts       bool
 		multiHosts      string
@@ -104,50 +105,57 @@ func main() {
 		defaultTsnetDir = filepath.Join(currentUser.HomeDir, ".config", clientName)
 	}
 
-	flag.StringVar(&sshUser, "l", defaultUser, "SSH Username")
-	flag.StringVar(&sshKeyPath, "i", defaultKeyPath, "Path to SSH private key")
-	flag.StringVar(&tsnetDir, "tsnet-dir", defaultTsnetDir, "Directory to store tsnet state")
-	flag.StringVar(&tsControlURL, "control-url", "", "Tailscale control plane URL (optional)")
-	flag.BoolVar(&verbose, "v", false, "Verbose logging")
-	flag.BoolVar(&insecureHostKey, "insecure", false, "Disable host key checking (INSECURE!)")
-	flag.StringVar(&forwardDest, "W", "", "forward stdio to destination host:port (for use as ProxyCommand)")
-	flag.BoolVar(&showVersion, "version", false, "Print version and exit")
+	// Initialize i18n early to support flag descriptions
+	// We'll do a basic initialization here and reinitialize after parsing flags
+	initI18n("")
+	
+	flag.StringVar(&langFlag, "lang", "", T("flag_lang_desc"))
+	flag.StringVar(&sshUser, "l", defaultUser, T("flag_user_desc"))
+	flag.StringVar(&sshKeyPath, "i", defaultKeyPath, T("flag_key_desc"))
+	flag.StringVar(&tsnetDir, "tsnet-dir", defaultTsnetDir, T("flag_tsnet_desc"))
+	flag.StringVar(&tsControlURL, "control-url", "", T("flag_control_desc"))
+	flag.BoolVar(&verbose, "v", false, T("flag_verbose_desc"))
+	flag.BoolVar(&insecureHostKey, "insecure", false, T("flag_insecure_desc"))
+	flag.StringVar(&forwardDest, "W", "", T("flag_forward_desc"))
+	flag.BoolVar(&showVersion, "version", false, T("flag_version_desc"))
 	
 	// Power CLI features
-	flag.BoolVar(&listHosts, "list", false, "List available Tailscale hosts")
-	flag.StringVar(&multiHosts, "multi", "", "Start tmux session with multiple hosts (comma-separated)")
-	flag.StringVar(&execCmd, "exec", "", "Execute command on specified hosts")
-	flag.StringVar(&copyFiles, "copy", "", "Copy files to multiple hosts (format: localfile host1,host2:/path/)")
-	flag.BoolVar(&pickHost, "pick", false, "Interactive host picker (simple selection)")
-	flag.BoolVar(&parallel, "parallel", false, "Execute commands in parallel (use with --exec)")
+	flag.BoolVar(&listHosts, "list", false, T("flag_list_desc"))
+	flag.StringVar(&multiHosts, "multi", "", T("flag_multi_desc"))
+	flag.StringVar(&execCmd, "exec", "", T("flag_exec_desc"))
+	flag.StringVar(&copyFiles, "copy", "", T("flag_copy_desc"))
+	flag.BoolVar(&pickHost, "pick", false, T("flag_pick_desc"))
+	flag.BoolVar(&parallel, "parallel", false, T("flag_parallel_desc"))
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [options] [user@]hostname[:port] [command...]\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "       %s --list                                    # List available hosts\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "       %s --multi host1,host2,host3                # Multi-host tmux session\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "       %s --exec \"command\" host1,host2             # Run command on multiple hosts\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "       %s --copy file.txt host1,host2:/tmp/        # Copy file to multiple hosts\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "       %s --pick                                   # Interactive host picker\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Powerful SSH/SCP tool for Tailscale networks.\n\nOptions:\n")
+		fmt.Fprintf(os.Stderr, T("usage_header")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("usage_list")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("usage_multi")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("usage_exec")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("usage_copy")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("usage_pick")+"\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("usage_description")+"\n")
 		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  Basic SSH:\n")
-		fmt.Fprintf(os.Stderr, "    %s user@host                    # Interactive SSH session\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "    %s user@host ls -lah            # Run remote command\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "\n  Host Discovery:\n")
-		fmt.Fprintf(os.Stderr, "    %s --list                       # Show all Tailscale hosts\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "    %s --pick                       # Pick host interactively\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "\n  Multi-Host Operations:\n")
-		fmt.Fprintf(os.Stderr, "    %s --multi web1,web2,db1        # Tmux session with 3 hosts\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "    %s --exec \"uptime\" web1,web2    # Run command on 2 hosts\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "    %s --parallel --exec \"ps aux\" web1,web2  # Parallel execution\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "\n  File Transfer:\n")
-		fmt.Fprintf(os.Stderr, "    %s local.txt user@host:/remote/ # Single SCP upload\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "    %s --copy deploy.sh web1,web2:/tmp/  # Multi-host SCP\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "\n  ProxyCommand:\n")
-		fmt.Fprintf(os.Stderr, "    %s -W host:port                 # Proxy stdio via Tailscale\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_header")+"\n")
+		fmt.Fprintf(os.Stderr, T("examples_basic_ssh")+"\n")
+		fmt.Fprintf(os.Stderr, T("examples_interactive")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_remote_cmd")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_host_discovery")+"\n")
+		fmt.Fprintf(os.Stderr, T("examples_list_hosts")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_pick_host")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_multi_host")+"\n")
+		fmt.Fprintf(os.Stderr, T("examples_tmux")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_exec_multi")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_parallel")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_file_transfer")+"\n")
+		fmt.Fprintf(os.Stderr, T("examples_scp_single")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_scp_multi")+"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, T("examples_proxy")+"\n")
+		fmt.Fprintf(os.Stderr, T("examples_proxy_cmd")+"\n", os.Args[0])
 	}
 	flag.Parse()
 
+	// Reinitialize i18n with the actual language flag after parsing
+	initI18n(langFlag)
 
 	var logger *log.Logger
 	if verbose {
@@ -165,7 +173,7 @@ func main() {
 	if listHosts || pickHost || multiHosts != "" || execCmd != "" || copyFiles != "" {
 		srv, ctx, status, err := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose, false)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize Tailscale connection: %v\n", err)
+			fmt.Fprintf(os.Stderr, T("error_init_tailscale")+"\n", err)
 			os.Exit(1)
 		}
 		defer srv.Close()
@@ -241,7 +249,7 @@ func main() {
 		// SCP mode is active.
 		srv, ctx, _, err := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose, false)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize Tailscale connection for SCP: %v\n", err)
+			fmt.Fprintf(os.Stderr, T("error_init_tailscale")+"\n", err)
 			os.Exit(1)
 		}
 		defer srv.Close()
@@ -251,10 +259,10 @@ func main() {
 			detectedScpArgs.isUpload, verbose)
 
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "SCP operation failed: %v\n", err)
+			fmt.Fprintf(os.Stderr, T("error_scp_failed")+"\n", err)
 			os.Exit(1)
 		}
-		fmt.Fprintln(os.Stderr, "SCP operation completed successfully.")
+		fmt.Fprintln(os.Stderr, T("scp_success"))
 		os.Exit(0)
 	}
 
@@ -271,7 +279,7 @@ func main() {
 
 	targetHost, targetPort, err := parseTarget(target, DefaultSshPort)
 	if err != nil {
-		logger.Fatalf("Error parsing target for SSH: %v", err)
+		logger.Fatalf(T("error_parsing_target"), err)
 	}
 	
 	sshSpecificUser := sshUser 
@@ -288,7 +296,7 @@ func main() {
 
 	srv, ctx, _, err := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose, false)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize Tailscale connection for SSH: %v\n", err)
+		fmt.Fprintf(os.Stderr, T("error_init_ssh")+"\n", err)
 		os.Exit(1)
 	}
 	defer srv.Close()
@@ -333,12 +341,12 @@ func main() {
 	keyAuth, err := LoadPrivateKey(sshKeyPath, logger)
 	if err == nil {
 		authMethods = append(authMethods, keyAuth)
-		logger.Printf("Using public key authentication: %s", sshKeyPath)
+		logger.Printf(T("using_key_auth"), sshKeyPath)
 	} else {
-		logger.Printf("Failed to load private key: %v. Will attempt password auth.", err)
+		logger.Printf(T("key_auth_failed"), err)
 	}
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		fmt.Printf("Enter password for %s@%s: ", sshSpecificUser, targetHost)
+		fmt.Printf(T("enter_password"), sshSpecificUser, targetHost)
 		bytePassword, errRead := term.ReadPassword(int(syscall.Stdin))
 		fmt.Println()
 		if errRead != nil {
@@ -349,7 +357,7 @@ func main() {
 
 	var hostKeyCallback ssh.HostKeyCallback
 	if insecureHostKey {
-		logger.Println("WARNING: Host key verification is disabled!")
+		logger.Println(T("host_key_warning"))
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	} else {
 		hostKeyCallback, err = CreateKnownHostsCallback(currentUser, logger)
@@ -366,26 +374,26 @@ func main() {
 	}
 
 	sshTargetAddr := net.JoinHostPort(targetHost, targetPort)
-	logger.Printf("Dialing %s via tsnet...", sshTargetAddr)
+	logger.Printf(T("dial_via_tsnet"), sshTargetAddr)
 	conn, err_dial := srv.Dial(nonTuiCtx, "tcp", sshTargetAddr) // Renamed err to err_dial to avoid conflict
 	if err_dial != nil {
-		log.Fatalf("Failed to dial %s via tsnet (is Tailscale connection up and host reachable?): %v", sshTargetAddr, err_dial)
+		log.Fatalf(T("dial_failed"), sshTargetAddr, err_dial)
 	}
 	logger.Printf("tsnet Dial successful. Establishing SSH connection...")
 
 	sshConn, chans, reqs, err_conn := ssh.NewClientConn(conn, sshTargetAddr, sshConfig) // Renamed err to err_conn
 	if err_conn != nil {
 		if strings.Contains(err_conn.Error(), "unable to authenticate") || strings.Contains(err_conn.Error(), "no supported authentication methods") {
-			log.Fatalf("SSH Authentication failed for user %s: %v", sshSpecificUser, err_conn)
+			log.Fatalf(T("ssh_auth_failed"), sshSpecificUser, err_conn)
 		}
 		var keyErr *knownhosts.KeyError
 		if errors.As(err_conn, &keyErr) {
-			log.Fatalf("SSH Host key verification failed: %v", err_conn)
+			log.Fatalf(T("host_key_failed"), err_conn)
 		}
-		log.Fatalf("Failed to establish SSH connection to %s: %v", sshTargetAddr, err_conn)
+		log.Fatalf(T("ssh_connection_failed"), sshTargetAddr, err_conn)
 	}
 	defer sshConn.Close()
-	logger.Println("SSH connection established.")
+	logger.Println(T("ssh_connection_established"))
 
 	client := ssh.NewClient(sshConn, chans, reqs)
 	defer client.Close()
@@ -461,7 +469,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to start remote shell: %v", err)
 	}
-	fmt.Fprintf(os.Stderr, "\nEscape sequence: ~. to terminate session\n")
+	fmt.Fprintf(os.Stderr, T("escape_sequence")+"\n")
 	go func() {
 		reader := bufio.NewReader(os.Stdin)
 		atLineStart := true
@@ -508,7 +516,7 @@ func main() {
 			log.Printf("SSH session ended with error: %v", err)
 		}
 	}
-	logger.Println("SSH session closed.")
+	logger.Println(T("ssh_session_closed"))
 }
 
 // Moved to tsnet_handler.go:
