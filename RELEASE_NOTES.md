@@ -1,4 +1,50 @@
-# ts-ssh 1.0.0 Release Notes
+# ts-ssh Release Notes
+
+## Version 1.1.0 - Spanish Language Support
+
+Date: 2025-06-17
+
+### New Features
+
+- **🌍 Spanish Language Support**  
+  Complete Spanish localization for all CLI help text, usage examples, and error messages. Supports multiple language detection methods:
+  - CLI flag: `--lang es` or `--lang=es`
+  - Environment variables: `TS_SSH_LANG=es`, `LANG=es`, `LC_ALL=es`
+  - Dynamic help display that respects language preferences immediately
+  - Language priority: CLI flag > TS_SSH_LANG > LC_ALL > LANG > default (English)
+
+- **Enhanced Internationalization Framework**  
+  Robust i18n infrastructure using `golang.org/x/text` with support for:
+  - Multiple locale environment variable detection
+  - Runtime language switching
+  - Proper message formatting with parameter substitution
+  - Extensible design for future language additions
+
+### Improvements
+
+- **Improved Language Detection**  
+  Now supports standard locale environment variables (`LANG`, `LC_ALL`) in addition to the custom `TS_SSH_LANG` variable
+- **Dynamic Help System**  
+  Help text (`-h`/`--help`) now immediately reflects the selected language, including when using CLI flags
+
+### Usage Examples
+
+```bash
+# Spanish interface via CLI flag
+ts-ssh --lang es --help
+ts-ssh --lang es --list
+
+# Spanish interface via environment
+LANG=es ts-ssh --help
+export TS_SSH_LANG=es && ts-ssh --list
+
+# Override environment with CLI flag
+LANG=es ts-ssh --lang en --help  # Shows English
+```
+
+---
+
+## Version 1.0.0 - Initial Release
 
 Date: 2025-04-18
 

@@ -23,7 +23,7 @@ import (
 // handleListHosts lists all available Tailscale hosts
 func handleListHosts(status *ipnstate.Status, verbose bool) error {
 	if status == nil || len(status.Peer) == 0 {
-		fmt.Println("No Tailscale peers found")
+		fmt.Println(T("no_peers_found"))
 		return nil
 	}
 
@@ -58,12 +58,25 @@ func handleListHosts(status *ipnstate.Status, verbose bool) error {
 
 	// Print results
 	if verbose {
-		fmt.Printf("%-25s %-15s %-8s %s\n", "HOST", "IP", "STATUS", "OS")
-		fmt.Printf("%-25s %-15s %-8s %s\n", "----", "--", "------", "--")
+		// Get individual labels for the header
+		labels := strings.Split(T("host_list_labels"), ",")
+		separators := strings.Split(T("host_list_separator"), ",")
+		
+		// Default fallback if translation fails
+		if len(labels) < 4 {
+			labels = []string{"HOST", "IP", "STATUS", "OS"}
+		}
+		if len(separators) < 4 {
+			separators = []string{"----", "--", "------", "--"}
+		}
+		
+		fmt.Printf("%-25s %-15s %-8s %s\n", labels[0], labels[1], labels[2], labels[3])
+		fmt.Printf("%-25s %-15s %-8s %s\n", separators[0], separators[1], separators[2], separators[3])
+		
 		for _, host := range hosts {
-			status := "OFFLINE"
+			status := T("status_offline")
 			if host.online {
-				status = "ONLINE"
+				status = T("status_online")
 			}
 			fmt.Printf("%-25s %-15s %-8s %s\n", host.name, host.ip, status, host.os)
 		}
@@ -84,7 +97,7 @@ func handlePickHost(srv *tsnet.Server, ctx context.Context, status *ipnstate.Sta
 	sshUser, sshKeyPath string, insecureHostKey bool, currentUser *user.User, verbose bool) error {
 	
 	if status == nil || len(status.Peer) == 0 {
-		return fmt.Errorf("no Tailscale peers found")
+		return fmt.Errorf(T("no_peers_found"))
 	}
 
 	// Collect online hosts
@@ -96,17 +109,17 @@ func handlePickHost(srv *tsnet.Server, ctx context.Context, status *ipnstate.Sta
 	}
 
 	if len(onlineHosts) == 0 {
-		return fmt.Errorf("no online hosts found")
+		return fmt.Errorf(T("no_online_hosts"))
 	}
 
 	sort.Strings(onlineHosts)
 
 	// Simple selection interface
-	fmt.Printf("Available hosts:\n")
+	fmt.Printf(T("available_hosts")+"\n")
 	for i, host := range onlineHosts {
 		fmt.Printf("  %d) %s\n", i+1, host)
 	}
-	fmt.Printf("\nSelect host (1-%d): ", len(onlineHosts))
+	fmt.Printf(T("select_host"), len(onlineHosts))
 
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
@@ -116,15 +129,15 @@ func handlePickHost(srv *tsnet.Server, ctx context.Context, status *ipnstate.Sta
 
 	var selection int
 	if _, err := fmt.Sscanf(strings.TrimSpace(input), "%d", &selection); err != nil {
-		return fmt.Errorf("invalid selection")
+		return fmt.Errorf(T("invalid_selection"))
 	}
 
 	if selection < 1 || selection > len(onlineHosts) {
-		return fmt.Errorf("selection out of range")
+		return fmt.Errorf(T("selection_out_of_range"))
 	}
 
 	selectedHost := onlineHosts[selection-1]
-	fmt.Printf("Connecting to %s...\n", selectedHost)
+	fmt.Printf(T("connecting_to")+"\n", selectedHost)
 
 	// Connect to selected host
 	return connectToHostFromTUI(srv, ctx, logger, selectedHost, sshUser, sshKeyPath, insecureHostKey, currentUser, verbose)
@@ -134,7 +147,7 @@ func handlePickHost(srv *tsnet.Server, ctx context.Context, status *ipnstate.Sta
 func handleMultiHosts(multiHosts string, logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool) error {
 	hosts := strings.Split(multiHosts, ",")
 	if len(hosts) == 0 {
-		return fmt.Errorf("no hosts specified")
+		return fmt.Errorf(T("no_hosts_specified"))
 	}
 
 	// Clean up host names
@@ -155,7 +168,7 @@ func handleExecCommand(srv *tsnet.Server, ctx context.Context, execCmd string, h
 	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, parallel, verbose bool) error {
 	
 	if len(hosts) == 0 {
-		return fmt.Errorf("no hosts specified for --exec")
+		return fmt.Errorf(T("no_hosts_for_exec"))
 	}
 
 	if parallel {
@@ -172,7 +185,7 @@ func handleCopyFiles(srv *tsnet.Server, ctx context.Context, copyFiles string, l
 	// Parse format: localfile host1,host2:/path/
 	parts := strings.Split(copyFiles, " ")
 	if len(parts) != 2 {
-		return fmt.Errorf("invalid --copy format. Use: localfile host1,host2:/path/")
+		return fmt.Errorf(T("invalid_copy_format"))
 	}
 
 	localFile := parts[0]
@@ -180,7 +193,7 @@ func handleCopyFiles(srv *tsnet.Server, ctx context.Context, copyFiles string, l
 
 	// Split remote spec into hosts and path
 	if !strings.Contains(remoteSpec, ":") {
-		return fmt.Errorf("invalid remote specification. Must include path after ':'")
+		return fmt.Errorf(T("invalid_remote_spec"))
 	}
 
 	colonIdx := strings.LastIndex(remoteSpec, ":")
@@ -194,19 +207,19 @@ func handleCopyFiles(srv *tsnet.Server, ctx context.Context, copyFiles string, l
 
 	// Copy to each host sequentially
 	for _, host := range hosts {
-		fmt.Printf("Copying %s to %s:%s...\n", localFile, host, remotePath)
+		fmt.Printf(T("copying_to")+"\n", localFile, host, remotePath)
 		
 		// Use our existing SCP logic
 		err := HandleCliScp(srv, ctx, logger, sshUser, sshKeyPath, insecureHostKey, nil,
 			localFile, remotePath, host, true, verbose)
 		
 		if err != nil {
-			fmt.Printf("Failed to copy to %s: %v\n", host, err)
+			fmt.Printf(T("copy_failed")+"\n", host, err)
 			continue
 		}
 		
 		if verbose {
-			fmt.Printf("Successfully copied to %s\n", host)
+			fmt.Printf(T("copy_success")+"\n", host)
 		}
 	}
 
@@ -296,7 +309,7 @@ func executeOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host string,
 
 	// Add password auth as fallback
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		fmt.Printf("Enter password for %s@%s: ", effectiveUser, targetHost)
+		fmt.Printf(T("enter_password"), effectiveUser, targetHost)
 		bytePassword, errRead := term.ReadPassword(int(syscall.Stdin))
 		fmt.Println()
 		if errRead != nil {

@@ -24,6 +24,7 @@ Perfect for DevOps teams who need fast, reliable SSH access across their Tailsca
 ### 🛠️ Professional DevOps Features
 *   **ProxyCommand support** (`-W`) for integration with standard tools
 *   **Cross-platform**: Linux, macOS (Intel/ARM), Windows
+*   **Multi-language support**: English and Spanish localization
 *   **Fast startup** - no UI frameworks or complex initialization
 *   **Composable commands** - works perfectly in scripts and automation
 *   **Clear error handling** and helpful feedback
@@ -106,6 +107,8 @@ Options:
         Disable host key checking (INSECURE!)
   -l string
         SSH Username (default "user")
+  -lang string
+        Language for CLI output (en, es)
   -list
         List available Tailscale hosts
   -multi string
@@ -203,6 +206,32 @@ ts-ssh -version
 # Verbose logging for debugging
 ts-ssh --list -v
 ```
+
+### 🌍 Language Support
+```bash
+# Use Spanish interface
+ts-ssh --lang es --list
+LANG=es ts-ssh --help
+
+# Use English (default)
+ts-ssh --lang en --help
+LC_ALL=en ts-ssh --help
+
+# Set permanent language preference
+export TS_SSH_LANG=es
+ts-ssh --help  # Now shows Spanish
+```
+
+**Language Detection Priority:**
+1. CLI flag (`--lang`)
+2. `TS_SSH_LANG` environment variable
+3. `LC_ALL` environment variable  
+4. `LANG` environment variable
+5. Default (English)
+
+**Supported Languages:**
+- 🇺🇸 **English** (`en`) - Default
+- 🇪🇸 **Spanish** (`es`) - Complete translation
 
 ### 💡 Real-World DevOps Scenarios
 ```bash
