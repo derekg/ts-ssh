@@ -153,6 +153,21 @@ func (sm *SessionManager) GetActiveSessionCount() int {
 	return count
 }
 
+// GetConnectedSessionCount returns the number of truly connected (not just connecting) sessions
+func (sm *SessionManager) GetConnectedSessionCount() int {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	
+	count := 0
+	for _, session := range sm.sessions {
+		status := session.GetStatus()
+		if status == SessionStatusActive || status == SessionStatusIdle {
+			count++
+		}
+	}
+	return count
+}
+
 // CloseSession closes and removes a session
 func (sm *SessionManager) CloseSession(sessionID string) error {
 	sm.mu.Lock()

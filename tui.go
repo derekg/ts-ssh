@@ -44,6 +44,7 @@ func startTUI(app *tview.Application, srv *tsnet.Server, appCtx context.Context,
 	logger.Printf("TUI started with SSH user: %s (from -l flag, user@host arg, or OS user)", sshUser)
 
 	result := tuiActionResult{} // This will store what the user selects
+	selectedHostsMap := make(map[string]bool) // Track selected hosts for multi-session
 
 	// Pages manage different views within the TUI (e.g., host list, action choice, SCP form)
 	pages := tview.NewPages()
@@ -158,7 +159,7 @@ func startTUI(app *tview.Application, srv *tsnet.Server, appCtx context.Context,
 		// but AddItem's func already handles clicks. This is for visual feedback on selection change.
 	})
 
-	// List view for choosing actions (SSH or SCP)
+	// List view for choosing actions (SSH, SCP, or Multi-Session)
 	actionList := tview.NewList().
 		AddItem("Interactive SSH", "Connect via an interactive SSH shell", 's', func() {
 			result.action = "ssh"
@@ -169,6 +170,10 @@ func startTUI(app *tview.Application, srv *tsnet.Server, appCtx context.Context,
 			// Before showing scpForm, ensure scpDetails are for the current host
 			// This is implicitly handled as result.selectedHostTarget is already set.
 			pages.ShowPage("scpForm") // Move to SCP parameters form
+		}).
+		AddItem("Multi-Session Mode", "Connect to multiple hosts with session switching", 'm', func() {
+			result.action = "multi-session"
+			pages.ShowPage("multiHostSelection") // Move to multi-host selection
 		}).
 		AddItem("Back to Host List", "Choose a different host", 'b', func() {
 			pages.HidePage("actionChoice")
@@ -204,6 +209,134 @@ func startTUI(app *tview.Application, srv *tsnet.Server, appCtx context.Context,
 	scpForm.SetBorder(true).SetTitle("SCP Parameters for: " + result.selectedHostTarget)
 	// Similar to actionList, title might need dynamic update if host changes.
 
+	// Multi-host selection page for session management
+	multiHostList := tview.NewList()
+	multiHostList.SetBorder(true).SetTitle("Select Multiple Online Hosts (Enter to select, Ctrl+D when done)")
+	
+	// Create multi-host selection page info first
+	multiHostInfo := tview.NewTextView().
+		SetTextAlign(tview.AlignCenter).
+		SetDynamicColors(true).
+		SetText("Enter to select/deselect hosts, Ctrl+D when done, 'q' to go back")
+	
+	// Function to refresh multi-host list display
+	var refreshMultiHostList func()
+	
+	// Function to populate multi-host selection list
+	populateMultiHostList := func(status *ipnstate.Status) {
+		multiHostList.Clear()
+		
+		if status == nil || len(status.Peer) == 0 {
+			multiHostList.AddItem("No peers found", "Please check your Tailscale network", 0, nil)
+			return
+		}
+		
+		// Create a stable, sorted list of online peers only
+		type peerInfo struct {
+			peer        *ipnstate.PeerStatus
+			displayName string
+			connectTarget string
+		}
+		
+		var onlinePeers []peerInfo
+		
+		for _, peer := range status.Peer {
+			// Skip offline peers for multi-session
+			if !peer.Online {
+				continue
+			}
+			
+			var baseDisplayName, connectTarget string
+			if peer.DNSName != "" {
+				baseDisplayName = strings.TrimSuffix(peer.DNSName, ".")
+				connectTarget = baseDisplayName
+			} else if peer.HostName != "" {
+				baseDisplayName = peer.HostName
+				connectTarget = baseDisplayName
+			} else if len(peer.TailscaleIPs) > 0 {
+				baseDisplayName = peer.TailscaleIPs[0].String()
+				connectTarget = peer.TailscaleIPs[0].String()
+			} else {
+				continue
+			}
+			
+			onlinePeers = append(onlinePeers, peerInfo{
+				peer: peer,
+				displayName: baseDisplayName,
+				connectTarget: connectTarget,
+			})
+		}
+		
+		// Sort peers by display name for stable ordering
+		for i := 0; i < len(onlinePeers)-1; i++ {
+			for j := i + 1; j < len(onlinePeers); j++ {
+				if onlinePeers[i].displayName > onlinePeers[j].displayName {
+					onlinePeers[i], onlinePeers[j] = onlinePeers[j], onlinePeers[i]
+				}
+			}
+		}
+		
+		if len(onlinePeers) == 0 {
+			multiHostList.AddItem("No online peers found", "All peers are currently offline", 0, nil)
+			return
+		}
+		
+		for _, peerInfo := range onlinePeers {
+			peer := peerInfo.peer
+			baseDisplayName := peerInfo.displayName
+			connectTarget := peerInfo.connectTarget
+			// Create display text with selection indicator
+			displayText := baseDisplayName
+			if selectedHostsMap[connectTarget] {
+				displayText = "[green]✓[white] " + baseDisplayName
+			} else {
+				displayText = "  " + baseDisplayName
+			}
+			
+			// Secondary text with IP and status (all are online)
+			secondaryText := ""
+			if len(peer.TailscaleIPs) > 0 {
+				secondaryText = peer.TailscaleIPs[0].String()
+			}
+			secondaryText += " [green][ONLINE][white]"
+			
+			// Capture variables for closure
+			capturedTarget := connectTarget
+			
+			multiHostList.AddItem(displayText, secondaryText, 0, func() {
+				// Toggle selection (all hosts here are online)
+				if selectedHostsMap[capturedTarget] {
+					delete(selectedHostsMap, capturedTarget)
+				} else {
+					selectedHostsMap[capturedTarget] = true
+				}
+				
+				// Refresh the list to show checkmarks
+				refreshMultiHostList()
+				
+				// Show feedback in info area
+				selectedCount := len(selectedHostsMap)
+				multiHostInfo.SetText(fmt.Sprintf("Selected %d hosts - Enter to select/deselect, Ctrl+D when done, 'q' to go back", selectedCount))
+			})
+		}
+	}
+	
+	// Initialize multi-host list
+	populateMultiHostList(initialStatus)
+	
+	// Define refresh function after populateMultiHostList
+	refreshMultiHostList = func() {
+		populateMultiHostList(initialStatus)
+	}
+	
+	// Multi-host selection uses Enter key to toggle selection
+	
+	// Multi-host page layout
+	
+	multiHostPage := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(multiHostList, 0, 10, true).
+		AddItem(multiHostInfo, 0, 1, false)
+
 	// Add pages to the page manager
 	pages.AddPage("hostSelection", tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(hostList, 0, 10, true). // hostList takes up most space, has focus
@@ -211,6 +344,7 @@ func startTUI(app *tview.Application, srv *tsnet.Server, appCtx context.Context,
 		true, true) // Resizable, visible
 	pages.AddPage("actionChoice", actionList, true, false) // Initially not visible
 	pages.AddPage("scpForm", scpForm, true, false)         // Initially not visible
+	pages.AddPage("multiHostSelection", multiHostPage, true, false) // Multi-host selection page
 
 	// When actionChoice page is shown, update its title
 	pages.SetChangedFunc(func() {
@@ -235,6 +369,44 @@ func startTUI(app *tview.Application, srv *tsnet.Server, appCtx context.Context,
 			return nil
 		}
 		currentPage, _ := pages.GetFrontPage()
+		
+		// Handle multi-host selection page keys
+		if currentPage == "multiHostSelection" {
+			if event.Rune() == 'q' {
+				pages.HidePage("multiHostSelection").ShowPage("actionChoice")
+				return nil
+			} else if event.Key() == tcell.KeyCtrlD {
+				// Ctrl+D - confirm selections
+				logger.Printf("Ctrl+D pressed for multi-session confirmation")
+				selectedHosts := make([]string, 0, len(selectedHostsMap))
+				for host := range selectedHostsMap {
+					selectedHosts = append(selectedHosts, host)
+				}
+				
+				logger.Printf("Selected hosts: %v (total: %d)", selectedHosts, len(selectedHosts))
+				
+				if len(selectedHosts) == 0 {
+					// Show error message briefly
+					logger.Printf("No hosts selected, showing error message")
+					multiHostInfo.SetText("[red]Please select at least one host[white]")
+					go func() {
+						time.Sleep(2 * time.Second)
+						app.QueueUpdateDraw(func() {
+							multiHostInfo.SetText("Enter to select/deselect hosts, Ctrl+D when done, 'q' to go back")
+						})
+					}()
+					return nil
+				}
+				
+				// Set result and exit TUI
+				logger.Printf("Setting multi-session result and stopping TUI")
+				result.action = "multi-session"
+				result.selectedHosts = selectedHosts
+				app.Stop()
+				return nil
+			}
+		}
+		
 		// If 'q' is pressed and we are on the host selection page, and hostList has focus
 		if event.Rune() == 'q' && currentPage == "hostSelection" && app.GetFocus() == hostList {
 			result.action = "" // Indicate exit

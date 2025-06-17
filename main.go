@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"os/user"
 	"path/filepath"
@@ -35,8 +36,9 @@ type scpArgs struct {
 
 // tuiActionResult defines what action the user selected in the TUI.
 type tuiActionResult struct {
-	action             string // "ssh", "scp", or "" if exited/cancelled
-	selectedHostTarget string // Hostname or IP for the connection
+	action             string   // "ssh", "scp", "multi-session", or "" if exited/cancelled
+	selectedHostTarget string   // Hostname or IP for single connection
+	selectedHosts      []string // Multiple hostnames for multi-session mode
 	// SCP specific fields
 	scpLocalPath  string
 	scpRemotePath string
@@ -92,6 +94,7 @@ func main() {
 		forwardDest     string
 		showVersion     bool
 		tuiMode         bool
+		testTmux        bool
 	)
 
 	currentUser, err := user.Current()
@@ -117,6 +120,7 @@ func main() {
 	flag.StringVar(&forwardDest, "W", "", "forward stdio to destination host:port (for use as ProxyCommand)")
 	flag.BoolVar(&showVersion, "version", false, "Print version and exit")
 	flag.BoolVar(&tuiMode, "tui", false, "Enable interactive TUI mode")
+	flag.BoolVar(&testTmux, "test-tmux", false, "Test tmux manager functionality")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] [user@]hostname[:port] [command...]\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "       %s [options] local_path user@hostname:remote_path\n", os.Args[0])
@@ -161,6 +165,75 @@ func main() {
 		os.Exit(0)
 	}
 
+	if testTmux {
+		testHosts := []string{"example1.host", "example2.host"}
+		fmt.Printf("Testing tmux manager with mock hosts: %v\n", testHosts)
+		
+		tmuxManager := NewTmuxManager(logger, sshUser, sshKeyPath, insecureHostKey)
+		
+		// Test if tmux is available
+		if !tmuxManager.isTmuxAvailable() {
+			fmt.Printf("ERROR: tmux is not installed or not available in PATH\n")
+			os.Exit(1)
+		}
+		fmt.Printf("✓ tmux is available\n")
+		
+		// Test session name generation
+		fmt.Printf("✓ Generated session name: %s\n", tmuxManager.sessionName)
+		
+		// Test SSH command building
+		for _, host := range testHosts {
+			sshCmd := tmuxManager.buildSSHCommand(host)
+			fmt.Printf("✓ SSH command for %s: %s\n", host, sshCmd)
+		}
+		
+		// Test tmux session creation (dry run - create session but don't attach)
+		fmt.Printf("Testing tmux session creation (will not attach)...\n")
+		
+		// Kill any existing session
+		tmuxManager.killExistingSession()
+		
+		// Create initial session without attaching
+		firstHost := testHosts[0]
+		err := tmuxManager.createInitialSessionDryRun(firstHost)
+		if err != nil {
+			fmt.Printf("ERROR creating initial session: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✓ Initial tmux session created successfully\n")
+		
+		// Add additional windows
+		for i, host := range testHosts[1:] {
+			windowName := fmt.Sprintf("ssh-%d", i+2)
+			err := tmuxManager.addWindow(windowName, host)
+			if err != nil {
+				fmt.Printf("WARNING: failed to add window for %s: %v\n", host, err)
+			} else {
+				fmt.Printf("✓ Added window %s for %s\n", windowName, host)
+			}
+		}
+		
+		// Configure tmux
+		tmuxManager.configureTmux()
+		fmt.Printf("✓ Tmux configuration applied\n")
+		
+		// List tmux sessions to verify
+		fmt.Printf("Current tmux sessions:\n")
+		listCmd := exec.Command("tmux", "list-sessions")
+		if output, err := listCmd.Output(); err == nil {
+			fmt.Printf("%s\n", string(output))
+		} else {
+			fmt.Printf("No tmux sessions or error listing: %v\n", err)
+		}
+		
+		// Clean up test session
+		fmt.Printf("Cleaning up test session...\n")
+		tmuxManager.CleanupSession()
+		fmt.Printf("✓ Test completed successfully!\n")
+		
+		os.Exit(0)
+	}
+
 	if tuiMode {
 		app := tview.NewApplication()
 		// For TUI mode, always use a discarded logger to prevent output interference
@@ -171,6 +244,12 @@ func main() {
 			os.Exit(1) 
 		}
 		defer srv.Close()
+		
+		// Check SSH key availability (will fallback to password if needed)
+		_, keyErr := LoadPrivateKey(sshKeyPath, tuiLogger)
+		if keyErr != nil && verbose {
+			logger.Printf("Note: SSH key not found at %s. Will use password authentication if needed.", sshKeyPath)
+		}
 
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -189,6 +268,7 @@ func main() {
 		}()
 
 		tuiResult, errTUI := startTUI(app, srv, appCtx, tuiLogger, initialStatus, sshUser, sshKeyPath, insecureHostKey, verbose)
+		logger.Printf("TUI returned - Action: '%s', Selected hosts: %v, Error: %v", tuiResult.action, tuiResult.selectedHosts, errTUI)
 		
 		// Restore stderr file descriptor after TUI operations complete
 		if stderrDevNull != nil {
@@ -245,6 +325,40 @@ func main() {
 				}
 			} else if verbose {
 				logger.Println("SCP action cancelled or host not selected.")
+			}
+		case "multi-session":
+			logger.Printf("Processing multi-session action. Selected hosts: %v", tuiResult.selectedHosts)
+			if len(tuiResult.selectedHosts) > 0 {
+				if verbose {
+					logger.Printf("Starting tmux multi-session mode with %d hosts: %v", len(tuiResult.selectedHosts), tuiResult.selectedHosts)
+				}
+				
+				// Create tmux manager
+				tmuxManager := NewTmuxManager(logger, sshUser, sshKeyPath, insecureHostKey)
+				
+				// Start tmux session with all selected hosts
+				errTUI = tmuxManager.StartMultiSession(tuiResult.selectedHosts)
+				if errTUI != nil {
+					logger.Printf("Failed to start tmux session: %v", errTUI)
+					// Fallback: show what command user can run manually
+					fmt.Fprintf(os.Stderr, "\nTmux session failed. You can manually connect to hosts:\n")
+					for i, host := range tuiResult.selectedHosts {
+						fmt.Fprintf(os.Stderr, "  %d. %s %s@%s\n", i+1, os.Args[0], sshUser, host)
+					}
+				} else {
+					if verbose {
+						logger.Printf("Tmux session ended normally")
+					}
+				}
+				
+				// Clean up tmux session
+				tmuxManager.CleanupSession()
+				
+			} else {
+				logger.Printf("Multi-session action but no hosts selected. selectedHosts length: %d", len(tuiResult.selectedHosts))
+				if verbose {
+					logger.Println("Multi-session action cancelled or no hosts selected.")
+				}
 			}
 		default:
 			if verbose {

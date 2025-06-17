@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"os/user"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
@@ -18,6 +20,9 @@ type SessionConnector struct {
 	sshKeyPath      string
 	insecureHostKey bool
 	currentUser     *user.User
+	// For multi-session password reuse
+	cachedPassword  string
+	hasTriedPassword bool
 }
 
 // NewSessionConnector creates a new session connector
@@ -52,12 +57,42 @@ func (sc *SessionConnector) ConnectSession(session *Session) error {
 		}
 	}
 	
-	// Add password authentication as fallback
+	// Add password authentication with caching for multi-session
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		// For multi-session mode, we can't prompt interactively
-		// This would need to be handled differently in the TUI
-		return "", fmt.Errorf("password authentication not supported in multi-session mode")
+		// If we already have a cached password, use it
+		if sc.cachedPassword != "" {
+			sc.logger.Printf("Session %s: Using cached password", session.ID)
+			return sc.cachedPassword, nil
+		}
+		
+		// If we've already tried and failed, don't prompt again
+		if sc.hasTriedPassword {
+			return "", fmt.Errorf("password authentication already failed for previous session")
+		}
+		
+		// Mark that we're trying password auth
+		sc.hasTriedPassword = true
+		
+		// Prompt for password (this will only happen for the first session)
+		sc.logger.Printf("Session %s: Prompting for password (will be reused for other sessions)", session.ID)
+		fmt.Printf("Enter password for %s@%s (will be reused for all selected hosts): ", session.SSHUser, session.HostTarget)
+		
+		// Read password without echoing
+		passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println() // Add newline after password input
+		
+		if err != nil {
+			return "", fmt.Errorf("failed to read password: %w", err)
+		}
+		
+		password := string(passwordBytes)
+		sc.cachedPassword = password // Cache for other sessions
+		sc.logger.Printf("Session %s: Password cached for reuse", session.ID)
+		
+		return password, nil
 	}))
+	
+	sc.logger.Printf("Session %s: Using %d authentication method(s) (key + password)", session.ID, len(authMethods))
 	
 	// Set up host key callback
 	var hostKeyCallback ssh.HostKeyCallback
@@ -78,7 +113,7 @@ func (sc *SessionConnector) ConnectSession(session *Session) error {
 		User:            session.SSHUser,
 		Auth:            authMethods,
 		HostKeyCallback: hostKeyCallback,
-		Timeout:         0, // No timeout for connection
+		Timeout:         15 * time.Second, // 15 second timeout for connection
 	}
 	
 	// Dial the SSH connection via tsnet
