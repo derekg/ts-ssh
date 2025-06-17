@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -383,9 +384,27 @@ func appendKnownHost(knownHostsPath, hostname string, remote net.Addr, key ssh.P
 	return nil
 }
 
+// getSigWinch returns SIGWINCH on Unix platforms, nil on Windows
+func getSigWinch() os.Signal {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	// This will only compile on Unix platforms
+	return syscall.Signal(0x1c) // SIGWINCH value on most Unix systems
+}
+
 func watchWindowSize(fd int, session *ssh.Session, ctx context.Context, logger *log.Logger) {
+	// Window resize monitoring is limited on some platforms
+	if runtime.GOOS == "windows" {
+		logger.Println("Window resize monitoring not supported on Windows")
+		return
+	}
+	
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGWINCH)
+	// Use reflection to access SIGWINCH on Unix platforms only
+	if sigWinch := getSigWinch(); sigWinch != nil {
+		signal.Notify(sigCh, sigWinch)
+	}
 	defer signal.Stop(sigCh) 
 
 	if term.IsTerminal(fd) {

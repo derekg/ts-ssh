@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -451,7 +452,9 @@ func main() {
 		if errPty != nil {
 			log.Fatalf("Failed to request pseudo-terminal: %v", errPty)
 		}
-		go watchWindowSize(fd, session, nonTuiCtx, logger)
+		if runtime.GOOS != "windows" {
+			go watchWindowSize(fd, session, nonTuiCtx, logger)
+		}
 	}
 
 	err = session.Shell()
