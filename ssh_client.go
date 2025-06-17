@@ -14,7 +14,6 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
-	"time"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -82,7 +81,7 @@ func connectToHostFromTUI(
 		User:            sshUser,
 		Auth:            authMethods,
 		HostKeyCallback: hostKeyCallback,
-		Timeout:         15 * time.Second, 
+		Timeout:         DefaultSSHTimeout, 
 	}
 
 	logger.Printf("TUI Connect: Dialing %s via tsnet...", sshTargetAddr)

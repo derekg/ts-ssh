@@ -74,7 +74,7 @@ func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsCon
 	// A small delay can improve reliability of fetching peers immediately after Up.
 	logger.Println("Waiting briefly for Tailscale connection to establish...")
 	select {
-	case <-time.After(3 * time.Second):
+	case <-time.After(ConnectionWaitTime):
 		// Continue after delay
 	case <-ctx.Done():
 		logger.Println("initTsNet: Context cancelled while waiting for connection to establish.")
@@ -90,7 +90,7 @@ func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsCon
 		logger.Printf("Warning: LocalClient is nil, cannot update Tailscale status. Using potentially stale status from Up().")
 	} else {
 		// Use a short timeout for this status check as the connection should be up.
-		statusCtx, statusCancel := context.WithTimeout(ctx, 5*time.Second)
+		statusCtx, statusCancel := context.WithTimeout(ctx, StatusUpdateTimeout)
 		defer statusCancel()
 		updatedStatus, errStatus := lc.Status(statusCtx)
 		if errStatus != nil {

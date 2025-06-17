@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
@@ -331,7 +330,7 @@ func executeOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host string,
 		User:            effectiveUser,
 		Auth:            authMethods,
 		HostKeyCallback: hostKeyCallback,
-		Timeout:         15 * time.Second,
+		Timeout:         DefaultSSHTimeout,
 	}
 
 	// Connect via tsnet
