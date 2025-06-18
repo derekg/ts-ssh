@@ -477,11 +477,14 @@ func handleInputWithTerminalState(stdinPipe io.WriteCloser, done chan bool, logg
 // handleSignalsAndResizeWithTerminalState handles signals and window resizing with terminal state
 func handleSignalsAndResizeWithTerminalState(session *ssh.Session, termState *TerminalStateManager, logger *log.Logger) {
 	// Set up signal channel for SIGWINCH (window resize)
-	sigCh := make(chan os.Signal, 1)
-	// SIGWINCH is not available on Windows
-	if runtime.GOOS != "windows" {
-		signal.Notify(sigCh, syscall.SIGWINCH)
+	// SIGWINCH is not available on Windows, so skip signal handling on Windows
+	if runtime.GOOS == "windows" {
+		// On Windows, we don't have SIGWINCH, so just return
+		return
 	}
+	
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGWINCH)
 	
 	for {
 		select {
