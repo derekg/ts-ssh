@@ -1,5 +1,98 @@
 # ts-ssh Release Notes
 
+## Version 1.2.0 - Code Quality & Architecture Improvements
+
+Date: 2025-06-18
+
+### Major Improvements
+
+- **🧹 Complete TUI Code Cleanup**  
+  Removed all dead terminal UI code and dependencies (180+ lines removed):
+  - Eliminated unused `connectToHostFromTUI` function
+  - Removed `tuiMode` parameter throughout codebase
+  - Cleaned TUI dependencies: `github.com/rivo/tview`, `github.com/gdamore/tcell/v2`
+  - Updated documentation to reflect streamlined CLI-only architecture
+
+- **🔧 SSH Code Consolidation**  
+  Major refactoring of SSH connection logic:
+  - Extracted shared `executeCommandOnHost` helper (~85 lines of duplication removed)
+  - Standardized SSH connection patterns across all modules
+  - Created comprehensive SSH helper functions in `ssh_helpers.go`
+  - Thread-safe authentication with proper mutex protection
+
+- **🐛 Critical i18n Formatting Fixes**  
+  Resolved double-formatting issues affecting user experience:
+  - **Fixed**: Password prompts now display `derek@bar` instead of `%!!(string=derek)s(MISSING)@%!!(string=bar)s(MISSING)`
+  - **Fixed**: Error messages with proper argument substitution
+  - **Improved**: Consistent T() function usage patterns across codebase
+
+- **🧪 Enhanced Test Coverage**  
+  Comprehensive test suite expansion (14.5% → 22% coverage):
+  - **New**: `i18n_test.go` - Race condition testing for concurrent translations
+  - **New**: `ssh_helpers_test.go` - SSH connection and authentication testing
+  - **New**: `terminal_state_test.go` - Thread-safe terminal state management
+  - **Enhanced**: `main_test.go` with additional utility function coverage
+
+### Architecture Improvements
+
+- **📁 Modular Code Organization**  
+  Split monolithic functions into focused, maintainable modules:
+  - `main_helpers.go` - Command-line argument parsing and operation routing
+  - `ssh_helpers.go` - Standardized SSH connection establishment
+  - `terminal_state.go` - Thread-safe terminal state management
+  - `constants.go` - Centralized application constants and configuration
+
+- **🏗️ Race Condition Fixes**  
+  Comprehensive thread safety improvements:
+  - Thread-safe i18n system with proper mutex protection
+  - Concurrent SSH authentication with shared mutex for password prompts
+  - Terminal state management with atomic operations
+
+- **📚 Enhanced Documentation**  
+  Comprehensive documentation for all public functions:
+  - Detailed parameter descriptions and return value documentation
+  - Usage examples and workflow explanations
+  - Updated `CLAUDE.md` with current architecture overview
+
+### Performance & Quality
+
+- **⚡ Build Improvements**  
+  - Removed unused imports and dependencies
+  - Centralized magic numbers into named constants
+  - Improved function naming for clarity and consistency
+
+- **🔒 Better Error Handling**  
+  - Consistent error patterns across all modules
+  - Enhanced error context with better user-facing messages
+  - Proper resource cleanup and defer patterns
+
+### Breaking Changes
+
+- **None** - All changes are backward compatible
+- Users will notice improved password prompt formatting
+- CLI behavior and flags remain unchanged
+
+### Technical Details
+
+**Files Added:**
+- `constants.go` - Application-wide constants
+- `main_helpers.go` - Refactored CLI argument handling  
+- `ssh_helpers.go` - SSH connection utilities
+- `terminal_state.go` - Thread-safe terminal management
+- `*_test.go` - Comprehensive test suites
+
+**Dependencies Removed:**
+- `github.com/rivo/tview` (TUI framework)
+- `github.com/gdamore/tcell/v2` (Terminal cell library)
+- Related indirect dependencies automatically cleaned
+
+**Code Metrics:**
+- **Removed**: 568 lines (dead code elimination)
+- **Added**: 796 lines (tests + architectural improvements)  
+- **Net Result**: Improved maintainability, better test coverage, cleaner codebase
+
+---
+
 ## Version 1.1.0 - Spanish Language Support
 
 Date: 2025-06-17
