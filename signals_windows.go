@@ -3,6 +3,8 @@
 package main
 
 import (
+	"log"
+
 	"golang.org/x/crypto/ssh"
 )
 

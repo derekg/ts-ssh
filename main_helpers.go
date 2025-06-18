@@ -7,12 +7,9 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/signal"
 	"os/user"
 	"path/filepath"
-	"runtime"
 	"strings"
-	"syscall"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
