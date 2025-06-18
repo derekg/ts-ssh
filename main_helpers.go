@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -477,7 +478,10 @@ func handleInputWithTerminalState(stdinPipe io.WriteCloser, done chan bool, logg
 func handleSignalsAndResizeWithTerminalState(session *ssh.Session, termState *TerminalStateManager, logger *log.Logger) {
 	// Set up signal channel for SIGWINCH (window resize)
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGWINCH)
+	// SIGWINCH is not available on Windows
+	if runtime.GOOS != "windows" {
+		signal.Notify(sigCh, syscall.SIGWINCH)
+	}
 	
 	for {
 		select {
