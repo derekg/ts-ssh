@@ -23,7 +23,14 @@ const (
 	TmuxSessionPrefix = "ts-ssh-"
 	
 	// Buffer sizes
-	DefaultBufferSize = 4096
+	DefaultBufferSize     = 4096
+	InputBufferSize       = 1024
+	HostOutputBufferSize  = 100
+	
+	// Retry and limit constants
+	MaxPasswordRetries    = 3
+	MaxConcurrentHosts    = 50
+	SessionWaitTimeout    = 5 * time.Second
 	
 	// File permissions
 	DefaultKeyPermissions = 0600

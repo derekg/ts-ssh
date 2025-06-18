@@ -96,7 +96,7 @@ func handlePickHost(srv *tsnet.Server, ctx context.Context, status *ipnstate.Sta
 	sshUser, sshKeyPath string, insecureHostKey bool, currentUser *user.User, verbose bool) error {
 	
 	if status == nil || len(status.Peer) == 0 {
-		return fmt.Errorf(T("no_peers_found"))
+		return fmt.Errorf("%s", T("no_peers_found"))
 	}
 
 	// Collect online hosts
@@ -108,17 +108,17 @@ func handlePickHost(srv *tsnet.Server, ctx context.Context, status *ipnstate.Sta
 	}
 
 	if len(onlineHosts) == 0 {
-		return fmt.Errorf(T("no_online_hosts"))
+		return fmt.Errorf("%s", T("no_online_hosts"))
 	}
 
 	sort.Strings(onlineHosts)
 
 	// Simple selection interface
-	fmt.Printf(T("available_hosts")+"\n")
+	fmt.Println(T("available_hosts"))
 	for i, host := range onlineHosts {
 		fmt.Printf("  %d) %s\n", i+1, host)
 	}
-	fmt.Printf(T("select_host"), len(onlineHosts))
+	fmt.Print(T("select_host", len(onlineHosts)))
 
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
@@ -128,25 +128,25 @@ func handlePickHost(srv *tsnet.Server, ctx context.Context, status *ipnstate.Sta
 
 	var selection int
 	if _, err := fmt.Sscanf(strings.TrimSpace(input), "%d", &selection); err != nil {
-		return fmt.Errorf(T("invalid_selection"))
+		return fmt.Errorf("%s", T("invalid_selection"))
 	}
 
 	if selection < 1 || selection > len(onlineHosts) {
-		return fmt.Errorf(T("selection_out_of_range"))
+		return fmt.Errorf("%s", T("selection_out_of_range"))
 	}
 
 	selectedHost := onlineHosts[selection-1]
-	fmt.Printf(T("connecting_to")+"\n", selectedHost)
+	fmt.Println(T("connecting_to", selectedHost))
 
 	// Connect to selected host
-	return connectToHostFromTUI(srv, ctx, logger, selectedHost, sshUser, sshKeyPath, insecureHostKey, currentUser, verbose)
+	return connectToHost(srv, ctx, logger, selectedHost, sshUser, sshKeyPath, insecureHostKey, currentUser, verbose)
 }
 
 // handleMultiHosts starts a tmux session with multiple hosts
 func handleMultiHosts(multiHosts string, logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool) error {
 	hosts := strings.Split(multiHosts, ",")
 	if len(hosts) == 0 {
-		return fmt.Errorf(T("no_hosts_specified"))
+		return fmt.Errorf("%s", T("no_hosts_specified"))
 	}
 
 	// Clean up host names
@@ -167,7 +167,7 @@ func handleExecCommand(srv *tsnet.Server, ctx context.Context, execCmd string, h
 	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, parallel, verbose bool) error {
 	
 	if len(hosts) == 0 {
-		return fmt.Errorf(T("no_hosts_for_exec"))
+		return fmt.Errorf("%s", T("no_hosts_for_exec"))
 	}
 
 	if parallel {
@@ -184,7 +184,7 @@ func handleCopyFiles(srv *tsnet.Server, ctx context.Context, copyFiles string, l
 	// Parse format: localfile host1,host2:/path/
 	parts := strings.Split(copyFiles, " ")
 	if len(parts) != 2 {
-		return fmt.Errorf(T("invalid_copy_format"))
+		return fmt.Errorf("%s", T("invalid_copy_format"))
 	}
 
 	localFile := parts[0]
@@ -192,7 +192,7 @@ func handleCopyFiles(srv *tsnet.Server, ctx context.Context, copyFiles string, l
 
 	// Split remote spec into hosts and path
 	if !strings.Contains(remoteSpec, ":") {
-		return fmt.Errorf(T("invalid_remote_spec"))
+		return fmt.Errorf("%s", T("invalid_remote_spec"))
 	}
 
 	colonIdx := strings.LastIndex(remoteSpec, ":")
@@ -206,19 +206,19 @@ func handleCopyFiles(srv *tsnet.Server, ctx context.Context, copyFiles string, l
 
 	// Copy to each host sequentially
 	for _, host := range hosts {
-		fmt.Printf(T("copying_to")+"\n", localFile, host, remotePath)
+		fmt.Println(T("copying_to", localFile, host, remotePath))
 		
 		// Use our existing SCP logic
 		err := HandleCliScp(srv, ctx, logger, sshUser, sshKeyPath, insecureHostKey, nil,
 			localFile, remotePath, host, true, verbose)
 		
 		if err != nil {
-			fmt.Printf(T("copy_failed")+"\n", host, err)
+			fmt.Println(T("copy_failed", host, err))
 			continue
 		}
 		
 		if verbose {
-			fmt.Printf(T("copy_success")+"\n", host)
+			fmt.Println(T("copy_success", host))
 		}
 	}
 
@@ -285,17 +285,16 @@ func executeSequential(srv *tsnet.Server, ctx context.Context, execCmd string, h
 	return nil
 }
 
-// executeOnHost executes a command on a single host and returns the output
-func executeOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host string,
-	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, verbose bool) (string, error) {
+// executeCommandOnHost executes a command on a remote host using SSH helpers
+func executeCommandOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host string,
+	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, authMutex *sync.Mutex) (string, error) {
 	
-	// Set up SSH connection similar to main SSH logic
+	// Parse target and user
 	targetHost, targetPort, err := parseTarget(host, DefaultSshPort)
 	if err != nil {
 		return "", fmt.Errorf("error parsing target %s: %w", host, err)
 	}
 
-	// Parse user from host if present
 	effectiveUser := sshUser
 	if strings.Contains(targetHost, "@") {
 		parts := strings.SplitN(targetHost, "@", 2)
@@ -303,68 +302,83 @@ func executeOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host string,
 		targetHost = parts[1]
 	}
 
-	// Set up SSH authentication
-	authMethods := []ssh.AuthMethod{}
-	if sshKeyPath != "" {
-		keyAuth, keyErr := LoadPrivateKey(sshKeyPath, logger)
-		if keyErr == nil {
+	// Create SSH config using standard helpers
+	sshConfig := SSHConnectionConfig{
+		User:            effectiveUser,
+		KeyPath:         sshKeyPath,
+		TargetHost:      targetHost,
+		TargetPort:      targetPort,
+		InsecureHostKey: insecureHostKey,
+		Verbose:         false,
+		CurrentUser:     nil, // Not needed for command execution
+		Logger:          logger,
+	}
+
+	// Override auth methods for thread-safe password prompts if needed
+	if authMutex != nil {
+		authMethods, err := createSSHAuthMethodsWithMutex(sshKeyPath, effectiveUser, targetHost, logger, authMutex)
+		if err != nil {
+			return "", fmt.Errorf("failed to create auth methods: %w", err)
+		}
+		
+		// Create client config manually for custom auth
+		clientConfig := &ssh.ClientConfig{
+			User:            effectiveUser,
+			Auth:            authMethods,
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // Simplified for parallel execution
+			Timeout:         DefaultSSHTimeout,
+		}
+		
+		return executeSSHCommandWithConfig(srv, ctx, clientConfig, targetHost, targetPort, execCmd)
+	}
+
+	// Use standard SSH helper for non-parallel execution
+	client, err := establishSSHConnection(srv, ctx, sshConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to establish SSH connection: %w", err)
+	}
+	defer client.Close()
+
+	return executeSSHCommand(client, execCmd)
+}
+
+// createSSHAuthMethodsWithMutex creates auth methods with thread-safe password prompts
+func createSSHAuthMethodsWithMutex(keyPath, user, targetHost string, logger *log.Logger, authMutex *sync.Mutex) ([]ssh.AuthMethod, error) {
+	var authMethods []ssh.AuthMethod
+
+	// Try to load SSH key if provided
+	if keyPath != "" {
+		keyAuth, err := LoadPrivateKey(keyPath, logger)
+		if err == nil {
 			authMethods = append(authMethods, keyAuth)
 		}
 	}
 
-	// Add password auth as fallback
+	// Add thread-safe password authentication
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		fmt.Printf(T("enter_password"), effectiveUser, targetHost)
-		bytePassword, errRead := term.ReadPassword(int(syscall.Stdin))
+		authMutex.Lock()
+		defer authMutex.Unlock()
+		
+		fmt.Print(T("enter_password", user, targetHost))
+		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 		fmt.Println()
-		if errRead != nil {
-			return "", fmt.Errorf("failed to read password: %w", errRead)
+		if err != nil {
+			return "", fmt.Errorf("failed to read password: %w", err)
 		}
 		return string(bytePassword), nil
 	}))
 
-	// Set up host key callback
-	var hostKeyCallback ssh.HostKeyCallback
-	if insecureHostKey {
-		hostKeyCallback = ssh.InsecureIgnoreHostKey()
-	} else {
-		// We don't have currentUser here, so use a simpler approach
-		hostKeyCallback = ssh.InsecureIgnoreHostKey() // For now, will improve later
-	}
+	return authMethods, nil
+}
 
-	sshConfig := &ssh.ClientConfig{
-		User:            effectiveUser,
-		Auth:            authMethods,
-		HostKeyCallback: hostKeyCallback,
-		Timeout:         DefaultSSHTimeout,
-	}
-
-	// Connect via tsnet
-	sshTargetAddr := net.JoinHostPort(targetHost, targetPort)
-	conn, err := srv.Dial(ctx, "tcp", sshTargetAddr)
-	if err != nil {
-		return "", fmt.Errorf("failed to dial %s via tsnet: %w", sshTargetAddr, err)
-	}
-
-	// Establish SSH connection
-	sshConn, chans, reqs, err := ssh.NewClientConn(conn, sshTargetAddr, sshConfig)
-	if err != nil {
-		conn.Close()
-		return "", fmt.Errorf("failed to establish SSH connection: %w", err)
-	}
-	defer sshConn.Close()
-
-	client := ssh.NewClient(sshConn, chans, reqs)
-	defer client.Close()
-
-	// Create session and run command
+// executeSSHCommand runs a command on an established SSH connection
+func executeSSHCommand(client *ssh.Client, execCmd string) (string, error) {
 	session, err := client.NewSession()
 	if err != nil {
 		return "", fmt.Errorf("failed to create SSH session: %w", err)
 	}
 	defer session.Close()
 
-	// Capture output
 	output, err := session.CombinedOutput(execCmd)
 	if err != nil {
 		return string(output), fmt.Errorf("command failed: %w", err)
@@ -373,71 +387,15 @@ func executeOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host string,
 	return string(output), nil
 }
 
-// executeOnHostSafe executes a command on a single host with thread-safe authentication
-func executeOnHostSafe(srv *tsnet.Server, ctx context.Context, execCmd, host string,
-	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, verbose bool, authMutex *sync.Mutex) (string, error) {
-	
-	// Set up SSH connection similar to main SSH logic
-	targetHost, targetPort, err := parseTarget(host, DefaultSshPort)
-	if err != nil {
-		return "", fmt.Errorf("error parsing target %s: %w", host, err)
-	}
-
-	// Parse user from host if present
-	effectiveUser := sshUser
-	if strings.Contains(targetHost, "@") {
-		parts := strings.SplitN(targetHost, "@", 2)
-		effectiveUser = parts[0]
-		targetHost = parts[1]
-	}
-
-	// Set up SSH authentication
-	authMethods := []ssh.AuthMethod{}
-	if sshKeyPath != "" {
-		keyAuth, keyErr := LoadPrivateKey(sshKeyPath, logger)
-		if keyErr == nil {
-			authMethods = append(authMethods, keyAuth)
-		}
-	}
-
-	// Add password auth with mutex protection to prevent concurrent prompts
-	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		authMutex.Lock()
-		defer authMutex.Unlock()
-		
-		fmt.Printf(T("enter_password"), effectiveUser, targetHost)
-		bytePassword, errRead := term.ReadPassword(int(syscall.Stdin))
-		fmt.Println()
-		if errRead != nil {
-			return "", fmt.Errorf("failed to read password: %w", errRead)
-		}
-		return string(bytePassword), nil
-	}))
-
-	// Set up host key callback
-	var hostKeyCallback ssh.HostKeyCallback
-	if insecureHostKey {
-		hostKeyCallback = ssh.InsecureIgnoreHostKey()
-	} else {
-		// Use insecure for parallel execution to avoid concurrent known_hosts access
-		hostKeyCallback = ssh.InsecureIgnoreHostKey()
-	}
-
-	sshConfig := &ssh.ClientConfig{
-		User:            effectiveUser,
-		Auth:            authMethods,
-		HostKeyCallback: hostKeyCallback,
-		Timeout:         DefaultSSHTimeout,
-	}
-
-	// Connect via tsnet
+// executeSSHCommandWithConfig runs a command using low-level SSH connection
+func executeSSHCommandWithConfig(srv *tsnet.Server, ctx context.Context, sshConfig *ssh.ClientConfig, targetHost, targetPort, execCmd string) (string, error) {
 	sshTargetAddr := net.JoinHostPort(targetHost, targetPort)
+	
 	conn, err := srv.Dial(ctx, "tcp", sshTargetAddr)
 	if err != nil {
 		return "", fmt.Errorf("failed to dial %s via tsnet: %w", sshTargetAddr, err)
 	}
 
-	// Establish SSH connection
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, sshTargetAddr, sshConfig)
 	if err != nil {
 		conn.Close()
@@ -448,20 +406,21 @@ func executeOnHostSafe(srv *tsnet.Server, ctx context.Context, execCmd, host str
 	client := ssh.NewClient(sshConn, chans, reqs)
 	defer client.Close()
 
-	// Create session and run command
-	session, err := client.NewSession()
-	if err != nil {
-		return "", fmt.Errorf("failed to create SSH session: %w", err)
-	}
-	defer session.Close()
+	return executeSSHCommand(client, execCmd)
+}
 
-	// Capture output
-	output, err := session.CombinedOutput(execCmd)
-	if err != nil {
-		return string(output), fmt.Errorf("command failed: %w", err)
-	}
+// executeOnHost executes a command on a single host and returns the output
+func executeOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host string,
+	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, verbose bool) (string, error) {
+	
+	return executeCommandOnHost(srv, ctx, execCmd, host, logger, sshUser, sshKeyPath, insecureHostKey, nil)
+}
 
-	return string(output), nil
+// executeOnHostSafe executes a command on a single host with thread-safe authentication
+func executeOnHostSafe(srv *tsnet.Server, ctx context.Context, execCmd, host string,
+	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, verbose bool, authMutex *sync.Mutex) (string, error) {
+	
+	return executeCommandOnHost(srv, ctx, execCmd, host, logger, sshUser, sshKeyPath, insecureHostKey, authMutex)
 }
 
 // parseHostList parses comma-separated host list from args

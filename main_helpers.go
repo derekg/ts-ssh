@@ -164,9 +164,9 @@ func isPowerCLIMode(config *AppConfig) bool {
 
 // handlePowerCLI handles all power CLI operations
 func handlePowerCLI(config *AppConfig) error {
-	srv, ctx, status, err := initTsNet(config.TsnetDir, ClientName, config.Logger, config.TsControlURL, config.Verbose, false)
+	srv, ctx, status, err := initTsNet(config.TsnetDir, ClientName, config.Logger, config.TsControlURL, config.Verbose)
 	if err != nil {
-		return fmt.Errorf(T("error_init_tailscale"), err)
+		return fmt.Errorf(T("error_init_tailscale", err))
 	}
 
 	// Get current user
@@ -216,9 +216,9 @@ func detectSCPOperation(config *AppConfig) *scpArgs {
 
 // handleSCPOperation performs the SCP file transfer
 func handleSCPOperation(scpArgs *scpArgs, config *AppConfig) error {
-	srv, ctx, _, err := initTsNet(config.TsnetDir, ClientName, config.Logger, config.TsControlURL, config.Verbose, false)
+	srv, ctx, _, err := initTsNet(config.TsnetDir, ClientName, config.Logger, config.TsControlURL, config.Verbose)
 	if err != nil {
-		return fmt.Errorf(T("error_init_tailscale"), err)
+		return fmt.Errorf(T("error_init_tailscale", err))
 	}
 
 	// Get current user
@@ -233,7 +233,7 @@ func handleSCPOperation(scpArgs *scpArgs, config *AppConfig) error {
 					  scpArgs.remotePath, scpArgs.targetHost, true, config.Verbose)
 
 	if err != nil {
-		return fmt.Errorf(T("error_scp_failed"), err)
+		return fmt.Errorf(T("error_scp_failed", err))
 	}
 
 	fmt.Println(T("scp_success"))
@@ -251,7 +251,7 @@ func handleSSHOperation(config *AppConfig) error {
 	config.Target = flag.Args()[0]
 	targetHost, targetPort, err := parseTarget(config.Target, DefaultSshPort)
 	if err != nil {
-		return fmt.Errorf(T("error_parsing_target"), err)
+		return fmt.Errorf(T("error_parsing_target", err))
 	}
 
 	// Determine SSH user
@@ -263,9 +263,9 @@ func handleSSHOperation(config *AppConfig) error {
 	}
 
 	// Initialize tsnet
-	srv, nonTuiCtx, _, err := initTsNet(config.TsnetDir, ClientName, config.Logger, config.TsControlURL, config.Verbose, false)
+	srv, nonTuiCtx, _, err := initTsNet(config.TsnetDir, ClientName, config.Logger, config.TsControlURL, config.Verbose)
 	if err != nil {
-		return fmt.Errorf(T("error_init_ssh"), err)
+		return fmt.Errorf(T("error_init_ssh", err))
 	}
 
 	// Handle ProxyCommand mode

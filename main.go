@@ -185,7 +185,7 @@ func main() {
 
 	// Handle power CLI features
 	if listHosts || pickHost || multiHosts != "" || execCmd != "" || copyFiles != "" {
-		srv, ctx, status, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose, false)
+		srv, ctx, status, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, T("error_init_tailscale")+"\n", err)
 			os.Exit(1)
@@ -261,7 +261,7 @@ func main() {
 
 	if detectedScpArgs != nil {
 		// SCP mode is active.
-		srv, ctx, _, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose, false)
+		srv, ctx, _, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, T("error_init_tailscale")+"\n", err)
 			os.Exit(1)
@@ -308,7 +308,7 @@ func main() {
 		logger.Printf("Starting %s (SSH mode)...", ClientName)
 	}
 
-	srv, ctx, _, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose, false)
+	srv, ctx, _, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, T("error_init_ssh")+"\n", err)
 		os.Exit(1)
@@ -491,4 +491,4 @@ func main() {
 }
 
 // Moved to tsnet_handler.go:
-// func initTsNet(tsnetDir, clientHostname string, logger *log.Logger, tsControlURL string, verbose, tuiMode bool) (*tsnet.Server, context.Context, *ipnstate.Status, error)
+// func initTsNet(tsnetDir, clientHostname string, logger *log.Logger, tsControlURL string, verbose bool) (*tsnet.Server, context.Context, *ipnstate.Status, error)

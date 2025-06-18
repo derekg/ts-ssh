@@ -25,8 +25,18 @@ type SSHConnectionConfig struct {
 	Logger          *log.Logger
 }
 
-// createSSHAuthMethods creates authentication methods for SSH connection
-// This eliminates the duplication of auth setup across multiple files
+// createSSHAuthMethods creates authentication methods for SSH connection.
+// It attempts to load an SSH private key from keyPath if provided, and always
+// includes password authentication as a fallback. This function eliminates
+// duplication of auth setup across multiple files.
+//
+// Parameters:
+//   - keyPath: path to SSH private key file (optional)
+//   - sshUser: username for SSH connection
+//   - targetHost: hostname for password prompts
+//   - logger: logger instance for debug output
+//
+// Returns a slice of ssh.AuthMethod and any error that occurred.
 func createSSHAuthMethods(keyPath, sshUser, targetHost string, logger *log.Logger) ([]ssh.AuthMethod, error) {
 	var authMethods []ssh.AuthMethod
 
@@ -47,7 +57,7 @@ func createSSHAuthMethods(keyPath, sshUser, targetHost string, logger *log.Logge
 
 	// Add password authentication as fallback
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		fmt.Printf(T("enter_password"), sshUser, targetHost)
+		fmt.Print(T("enter_password", sshUser, targetHost))
 		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 		fmt.Println()
 		if err != nil {
@@ -59,8 +69,16 @@ func createSSHAuthMethods(keyPath, sshUser, targetHost string, logger *log.Logge
 	return authMethods, nil
 }
 
-// createSSHConfig creates an SSH client configuration
-// This standardizes SSH config creation across the codebase
+// createSSHConfig creates an SSH client configuration from the provided parameters.
+// This function standardizes SSH configuration creation across the codebase,
+// handling authentication methods and host key verification consistently.
+//
+// The function sets up:
+//   - Authentication methods (key-based and password)
+//   - Host key verification (secure or insecure mode)
+//   - Connection timeout settings
+//
+// Returns a configured ssh.ClientConfig ready for connection establishment.
 func createSSHConfig(config SSHConnectionConfig) (*ssh.ClientConfig, error) {
 	// Create authentication methods
 	authMethods, err := createSSHAuthMethods(config.KeyPath, config.User, config.TargetHost, config.Logger)
@@ -91,8 +109,17 @@ func createSSHConfig(config SSHConnectionConfig) (*ssh.ClientConfig, error) {
 	}, nil
 }
 
-// establishSSHConnection creates a complete SSH connection using tsnet
-// This consolidates the connection establishment pattern used across multiple files
+// establishSSHConnection creates a complete SSH connection using tsnet.
+// This function consolidates the connection establishment pattern used across
+// multiple files, providing a standardized way to connect to SSH hosts via Tailscale.
+//
+// The connection process includes:
+//   1. Creating SSH client configuration
+//   2. Establishing TCP connection via tsnet
+//   3. Performing SSH handshake
+//   4. Returning ready-to-use SSH client
+//
+// Returns an active ssh.Client that must be closed by the caller.
 func establishSSHConnection(srv *tsnet.Server, ctx context.Context, config SSHConnectionConfig) (*ssh.Client, error) {
 	// Create SSH configuration
 	sshConfig, err := createSSHConfig(config)
@@ -110,14 +137,14 @@ func establishSSHConnection(srv *tsnet.Server, ctx context.Context, config SSHCo
 	// Dial via tsnet
 	conn, err := srv.Dial(ctx, "tcp", sshTargetAddr)
 	if err != nil {
-		return nil, fmt.Errorf(T("dial_failed"), sshTargetAddr, err)
+		return nil, fmt.Errorf(T("dial_failed", sshTargetAddr, err))
 	}
 
 	// Establish SSH connection
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, sshTargetAddr, sshConfig)
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf(T("ssh_connection_failed"), sshTargetAddr, err)
+		return nil, fmt.Errorf(T("ssh_connection_failed", sshTargetAddr, err))
 	}
 
 	client := ssh.NewClient(sshConn, chans, reqs)
