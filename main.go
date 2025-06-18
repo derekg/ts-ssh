@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"os"
 	"os/signal"
 	"os/user"
@@ -16,10 +15,8 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
-	"time"
 
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/knownhosts"
 	"golang.org/x/term"
 )
 
@@ -37,8 +34,7 @@ type scpArgs struct {
 var version = "dev"
 
 // DefaultSshPort is the default SSH port.
-const DefaultSshPort = "22" // Made public
-const clientName = "ts-ssh-client" // How this client appears in Tailscale admin console
+// ClientName is now defined in constants.go
 
 // parseScpRemoteArg parses an SCP remote argument string (e.g., "user@host:path" or "host:path")
 // It returns the host, path, and user. If user is not in the string, it returns the default SSH user.
@@ -102,7 +98,7 @@ func main() {
 	}
 	defaultTsnetDir := ""
 	if currentUser != nil {
-		defaultTsnetDir = filepath.Join(currentUser.HomeDir, ".config", clientName)
+		defaultTsnetDir = filepath.Join(currentUser.HomeDir, ".config", ClientName)
 	}
 
 	// Initialize i18n early to support flag descriptions
@@ -189,7 +185,7 @@ func main() {
 
 	// Handle power CLI features
 	if listHosts || pickHost || multiHosts != "" || execCmd != "" || copyFiles != "" {
-		srv, ctx, status, err := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose, false)
+		srv, ctx, status, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, T("error_init_tailscale")+"\n", err)
 			os.Exit(1)
@@ -265,7 +261,7 @@ func main() {
 
 	if detectedScpArgs != nil {
 		// SCP mode is active.
-		srv, ctx, _, err := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose, false)
+		srv, ctx, _, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, T("error_init_tailscale")+"\n", err)
 			os.Exit(1)
@@ -309,10 +305,10 @@ func main() {
 	}
 	
 	if verbose {
-		logger.Printf("Starting %s (SSH mode)...", clientName)
+		logger.Printf("Starting %s (SSH mode)...", ClientName)
 	}
 
-	srv, ctx, _, err := initTsNet(tsnetDir, clientName, logger, tsControlURL, verbose, false)
+	srv, ctx, _, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, T("error_init_ssh")+"\n", err)
 		os.Exit(1)
@@ -355,70 +351,27 @@ func main() {
 	}
 	logger.Printf("tsnet potentially initialized. Attempting SSH connection to %s@%s:%s", sshSpecificUser, targetHost, targetPort)
 
-	authMethods := []ssh.AuthMethod{}
-	keyAuth, err := LoadPrivateKey(sshKeyPath, logger)
-	if err == nil {
-		authMethods = append(authMethods, keyAuth)
-		logger.Printf(T("using_key_auth"), sshKeyPath)
-	} else {
-		logger.Printf(T("key_auth_failed"), err)
-	}
-	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		fmt.Printf(T("enter_password"), sshSpecificUser, targetHost)
-		bytePassword, errRead := term.ReadPassword(int(syscall.Stdin))
-		fmt.Println()
-		if errRead != nil {
-			return "", fmt.Errorf("failed to read password: %w", errRead)
-		}
-		return string(bytePassword), nil
-	}))
-
-	var hostKeyCallback ssh.HostKeyCallback
-	if insecureHostKey {
-		logger.Println(T("host_key_warning"))
-		hostKeyCallback = ssh.InsecureIgnoreHostKey()
-	} else {
-		hostKeyCallback, err = CreateKnownHostsCallback(currentUser, logger)
-		if err != nil {
-			log.Fatalf("Could not set up host key verification: %v", err)
-		}
-	}
-
-	sshConfig := &ssh.ClientConfig{
+	// Use the new helper function for SSH connection setup
+	sshConfig := SSHConnectionConfig{
 		User:            sshSpecificUser,
-		Auth:            authMethods,
-		HostKeyCallback: hostKeyCallback,
-		Timeout:         15 * time.Second,
+		KeyPath:         sshKeyPath,
+		TargetHost:      targetHost,
+		TargetPort:      targetPort,
+		InsecureHostKey: insecureHostKey,
+		Verbose:         verbose,
+		CurrentUser:     currentUser,
+		Logger:          logger,
 	}
 
-	sshTargetAddr := net.JoinHostPort(targetHost, targetPort)
-	logger.Printf(T("dial_via_tsnet"), sshTargetAddr)
-	conn, err_dial := srv.Dial(nonTuiCtx, "tcp", sshTargetAddr) // Renamed err to err_dial to avoid conflict
-	if err_dial != nil {
-		log.Fatalf(T("dial_failed"), sshTargetAddr, err_dial)
+	client, err := establishSSHConnection(srv, nonTuiCtx, sshConfig)
+	if err != nil {
+		log.Fatalf("Failed to establish SSH connection: %v", err)
 	}
-	logger.Printf("tsnet Dial successful. Establishing SSH connection...")
-
-	sshConn, chans, reqs, err_conn := ssh.NewClientConn(conn, sshTargetAddr, sshConfig) // Renamed err to err_conn
-	if err_conn != nil {
-		if strings.Contains(err_conn.Error(), "unable to authenticate") || strings.Contains(err_conn.Error(), "no supported authentication methods") {
-			log.Fatalf(T("ssh_auth_failed"), sshSpecificUser, err_conn)
-		}
-		var keyErr *knownhosts.KeyError
-		if errors.As(err_conn, &keyErr) {
-			log.Fatalf(T("host_key_failed"), err_conn)
-		}
-		log.Fatalf(T("ssh_connection_failed"), sshTargetAddr, err_conn)
-	}
-	defer sshConn.Close()
-	logger.Println(T("ssh_connection_established"))
-
-	client := ssh.NewClient(sshConn, chans, reqs)
 	defer client.Close()
 
 	if len(remoteCmd) > 0 {
 		logger.Printf("Running remote command: %v", remoteCmd)
-		session, errSession := client.NewSession()
+		session, errSession := createSSHSession(client)
 		if errSession != nil {
 			log.Fatalf("Failed to create SSH session for remote command: %v", errSession)
 		}
@@ -437,7 +390,7 @@ func main() {
 	}
 
 	logger.Println("Starting interactive SSH session...")
-	session, err := client.NewSession()
+	session, err := createSSHSession(client)
 	if err != nil {
 		log.Fatalf("Failed to create SSH session: %v", err)
 	}
@@ -466,13 +419,13 @@ func main() {
 	if term.IsTerminal(fd) {
 		termWidth, termHeight, errSize := term.GetSize(fd)
 		if errSize != nil {
-			logger.Printf("Warning: Failed to get terminal size: %v. Using default 80x24.", errSize)
-			termWidth = 80
-			termHeight = 24
+			logger.Printf("Warning: Failed to get terminal size: %v. Using default %dx%d.", errSize, DefaultTerminalWidth, DefaultTerminalHeight)
+			termWidth = DefaultTerminalWidth
+			termHeight = DefaultTerminalHeight
 		}
 		termType := os.Getenv("TERM")
 		if termType == "" {
-			termType = "xterm-256color"
+			termType = DefaultTerminalType
 		}
 		errPty := session.RequestPty(termType, termHeight, termWidth, ssh.TerminalModes{})
 		if errPty != nil {
@@ -538,4 +491,4 @@ func main() {
 }
 
 // Moved to tsnet_handler.go:
-// func initTsNet(tsnetDir, clientHostname string, logger *log.Logger, tsControlURL string, verbose, tuiMode bool) (*tsnet.Server, context.Context, *ipnstate.Status, error)
+// func initTsNet(tsnetDir, clientHostname string, logger *log.Logger, tsControlURL string, verbose bool) (*tsnet.Server, context.Context, *ipnstate.Status, error)

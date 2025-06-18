@@ -14,7 +14,7 @@ import (
 
 // initTsNet initializes the tsnet server and returns the server instance, context,
 // current Tailscale status, and any error that occurred.
-func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsControlURL string, verbose bool, tuiMode bool) (*tsnet.Server, context.Context, *ipnstate.Status, error) {
+func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsControlURL string, verbose bool) (*tsnet.Server, context.Context, *ipnstate.Status, error) {
 	if tsnetDir == "" {
 		// Fallback directory name if user.Current() failed in main or not provided.
 		// This is less ideal as it's not user-specific.
@@ -49,7 +49,7 @@ func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsCon
 
 	// Attempt to bring up the tsnet server.
 	// srv.Up will block until the server is up or context is cancelled.
-	if !verbose && !tuiMode {
+	if !verbose {
 		fmt.Fprintf(os.Stderr, "Starting Tailscale connection... You may need to authenticate.\nLook for a URL printed below if needed.\n")
 	}
 	status, err := srv.Up(ctx)
@@ -65,7 +65,7 @@ func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsCon
 	}
 
 	// If not verbose and an AuthURL is present, print it to help the user.
-	if !verbose && !tuiMode && status != nil && status.AuthURL != "" {
+	if !verbose && status != nil && status.AuthURL != "" {
 		fmt.Fprintf(os.Stderr, "\nTo authenticate, visit:\n%s\n", status.AuthURL)
 		fmt.Fprintf(os.Stderr, "Please authenticate in the browser. The client will then attempt to connect.\n")
 	}
@@ -74,7 +74,7 @@ func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsCon
 	// A small delay can improve reliability of fetching peers immediately after Up.
 	logger.Println("Waiting briefly for Tailscale connection to establish...")
 	select {
-	case <-time.After(3 * time.Second):
+	case <-time.After(ConnectionWaitTime):
 		// Continue after delay
 	case <-ctx.Done():
 		logger.Println("initTsNet: Context cancelled while waiting for connection to establish.")
@@ -90,7 +90,7 @@ func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsCon
 		logger.Printf("Warning: LocalClient is nil, cannot update Tailscale status. Using potentially stale status from Up().")
 	} else {
 		// Use a short timeout for this status check as the connection should be up.
-		statusCtx, statusCancel := context.WithTimeout(ctx, 5*time.Second)
+		statusCtx, statusCancel := context.WithTimeout(ctx, StatusUpdateTimeout)
 		defer statusCancel()
 		updatedStatus, errStatus := lc.Status(statusCtx)
 		if errStatus != nil {

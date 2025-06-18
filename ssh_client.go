@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -14,7 +13,6 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
-	"time"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -25,9 +23,9 @@ import (
 // defaultSSHPort is defined in main.go (or should be made accessible globally)
 // For now, we assume it's accessible or HandleCliScp will use its own.
 
-// connectToHostFromTUI handles the SSH connection logic when initiated from the TUI.
-// It establishes a connection to the targetHost using the provided tsnet.Server.
-func connectToHostFromTUI(
+// connectToHost handles SSH connection and starts an interactive session
+// This replaces the old TUI-specific connection logic with standardized SSH helpers
+func connectToHost(
 	srv *tsnet.Server,
 	appCtx context.Context, 
 	logger *log.Logger,
@@ -38,172 +36,27 @@ func connectToHostFromTUI(
 	currentUser *user.User, 
 	verbose bool,
 ) error {
-	logger.Printf("TUI Connect: Attempting SSH connection to %s@%s (key: %s)", sshUser, targetHost, sshKeyPath)
-
-	sshTargetAddr := net.JoinHostPort(targetHost, DefaultSshPort) // Use public constant
-
-	authMethods := []ssh.AuthMethod{}
-	if sshKeyPath != "" {
-		keyAuth, err := LoadPrivateKey(sshKeyPath, logger) // Changed to public LoadPrivateKey
-		if err == nil {
-			authMethods = append(authMethods, keyAuth)
-			logger.Printf("TUI Connect: Using public key authentication: %s", sshKeyPath)
-		} else {
-			logger.Printf("TUI Connect: Could not load private key %q: %v. Will attempt password auth.", sshKeyPath, err)
-		}
-	} else {
-		logger.Printf("TUI Connect: No SSH key path specified. Will attempt password auth.")
-	}
-
-	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		fmt.Printf("Enter password for %s@%s: ", sshUser, targetHost)
-		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
-		fmt.Println()
-		if err != nil {
-			return "", fmt.Errorf("failed to read password: %w", err)
-		}
-		return string(bytePassword), nil
-	}))
-
-	var hostKeyCallback ssh.HostKeyCallback
-	var err error
-	if insecureHostKey {
-		logger.Println("TUI Connect: WARNING! Host key verification is disabled!")
-		hostKeyCallback = ssh.InsecureIgnoreHostKey()
-	} else {
-		hostKeyCallback, err = CreateKnownHostsCallback(currentUser, logger) // Changed to public CreateKnownHostsCallback
-		if err != nil {
-			logger.Printf("TUI Connect: Could not set up host key verification: %v", err)
-			return fmt.Errorf("host key setup failed: %w", err)
-		}
-	}
-
-	sshConfig := &ssh.ClientConfig{
+	// Use the standard SSH helper configuration
+	sshConfig := SSHConnectionConfig{
 		User:            sshUser,
-		Auth:            authMethods,
-		HostKeyCallback: hostKeyCallback,
-		Timeout:         15 * time.Second, 
+		KeyPath:         sshKeyPath,
+		TargetHost:      targetHost,
+		TargetPort:      DefaultSshPort,
+		InsecureHostKey: insecureHostKey,
+		Verbose:         verbose,
+		CurrentUser:     currentUser,
+		Logger:          logger,
 	}
 
-	logger.Printf("TUI Connect: Dialing %s via tsnet...", sshTargetAddr)
-	dialCtx, dialCancel := context.WithTimeout(appCtx, sshConfig.Timeout)
-	defer dialCancel()
-
-	conn, err := srv.Dial(dialCtx, "tcp", sshTargetAddr)
+	// Establish SSH connection using standardized helper
+	client, err := establishSSHConnection(srv, appCtx, sshConfig)
 	if err != nil {
-		logger.Printf("TUI Connect: Failed to dial %s via tsnet: %v", sshTargetAddr, err)
-		return fmt.Errorf("tsnet dial failed for %s: %w", sshTargetAddr, err)
+		return fmt.Errorf("failed to establish SSH connection: %w", err)
 	}
+	defer client.Close()
 
-	logger.Printf("TUI Connect: tsnet Dial successful. Establishing SSH connection to %s...", sshTargetAddr)
-	sshConn, chans, reqs, err := ssh.NewClientConn(conn, sshTargetAddr, sshConfig)
-	if err != nil {
-		if strings.Contains(err.Error(), "unable to authenticate") || strings.Contains(err.Error(), "no supported authentication methods") {
-			logger.Printf("TUI Connect: SSH Authentication failed for user %s: %v", sshUser, err)
-		} else {
-			var keyErr *knownhosts.KeyError
-			if errors.As(err, &keyErr) {
-				logger.Printf("TUI Connect: SSH Host key verification failed: %v", keyErr)
-			} else {
-				logger.Printf("TUI Connect: Failed to establish SSH connection to %s: %v", sshTargetAddr, err)
-			}
-		}
-		conn.Close() 
-		return fmt.Errorf("ssh connection failed: %w", err)
-	}
-	defer sshConn.Close()
-	logger.Println("TUI Connect: SSH connection established.")
-
-	client := ssh.NewClient(sshConn, chans, reqs)
-	defer client.Close() 
-
-	logger.Println("TUI Connect: Starting interactive SSH session...")
-	session, err := client.NewSession()
-	if err != nil {
-		logger.Printf("TUI Connect: Failed to create SSH session: %v", err)
-		return fmt.Errorf("failed to create session: %w", err)
-	}
-	defer session.Close()
-
-	fd := int(os.Stdin.Fd())
-	var oldState *term.State
-	if term.IsTerminal(fd) {
-		oldState, err = term.MakeRaw(fd)
-		if err != nil {
-			logger.Printf("TUI Connect: Warning: Failed to set terminal to raw mode: %v. Session might not work correctly.", err)
-		} else {
-			defer term.Restore(fd, oldState)
-		}
-	} else {
-		logger.Println("TUI Connect: Input is not a terminal. Interactive session may not work as expected without PTY.")
-	}
-
-	session.Stdin = os.Stdin
-	session.Stdout = os.Stdout
-	session.Stderr = os.Stderr
-
-	if term.IsTerminal(fd) {
-		termWidth, termHeight, errSize := term.GetSize(fd)
-		if errSize != nil {
-			logger.Printf("TUI Connect: Warning: Failed to get terminal size: %v. Using default 80x24.", errSize)
-			termWidth = 80  
-			termHeight = 24 
-		}
-		termType := os.Getenv("TERM")
-		if termType == "" {
-			termType = "xterm-256color" 
-		}
-		errPty := session.RequestPty(termType, termHeight, termWidth, ssh.TerminalModes{})
-		if errPty != nil {
-			logger.Printf("TUI Connect: Failed to request pseudo-terminal: %v", errPty)
-			return fmt.Errorf("pty request failed: %w", errPty)
-		}
-		if oldState != nil { 
-			go watchWindowSize(fd, session, appCtx, logger) 
-		}
-	}
-
-	if err := session.Shell(); err != nil {
-		logger.Printf("TUI Connect: Failed to start remote shell: %v", err)
-		return fmt.Errorf("shell start failed: %w", err)
-	}
-
-	sessionDone := make(chan struct{})
-	go func() {
-		select {
-		case <-appCtx.Done():
-			logger.Println("TUI Connect: Application context cancelled during session, closing SSH session.")
-			session.Close() 
-		case <-sessionDone:
-		}
-	}()
-
-	err = session.Wait()
-	close(sessionDone) 
-
-	if err != nil {
-		if errors.Is(err, context.Canceled) || (appCtx.Err() != nil && strings.Contains(err.Error(), "session closed")) {
-			logger.Println("TUI Connect: SSH session explicitly cancelled via context.")
-			return nil 
-		}
-		if exitErr, ok := err.(*ssh.ExitError); ok {
-			if verbose {
-				logger.Printf("TUI Connect: Remote command/shell exited with status %d", exitErr.ExitStatus())
-			}
-			return nil
-		}
-		if !errors.Is(err, io.EOF) &&
-			!strings.Contains(err.Error(), "session closed") &&
-			!strings.Contains(err.Error(), "channel closed") &&
-			!strings.Contains(err.Error(), "connection reset by peer") && 
-			!strings.Contains(err.Error(), "broken pipe") { 
-			logger.Printf("TUI Connect: SSH session ended with error: %v", err)
-			return fmt.Errorf("ssh session error: %w", err)
-		}
-	}
-
-	logger.Println("TUI Connect: SSH session closed.")
-	return nil
+	// Start interactive session using standardized helper
+	return startInteractiveSession(client, logger)
 }
 
 // LoadPrivateKey loads an SSH private key from the given path.

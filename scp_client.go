@@ -64,7 +64,7 @@ func HandleCliScp(
 	}
 
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		fmt.Printf(T("scp_enter_password"), sshUser, targetHost)
+		fmt.Print(T("scp_enter_password", sshUser, targetHost))
 		bytePassword, passErr := term.ReadPassword(int(syscall.Stdin))
 		fmt.Println()
 		if passErr != nil {
