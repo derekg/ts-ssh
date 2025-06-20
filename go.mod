@@ -1,4 +1,4 @@
-module github.com/yourusername/ts-ssh
+module github.com/derekg/ts-ssh
 
 go 1.24.1
 
