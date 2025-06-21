@@ -90,16 +90,31 @@ func validateTTYSecurity(ttyPath string) error {
 		return fmt.Errorf("cannot get TTY ownership information")
 	}
 
-	// Check ownership - TTY should be owned by current user
 	currentUID := uint32(os.Getuid())
-	if stat.Uid != currentUID {
-		return fmt.Errorf("TTY not owned by current user (owned by UID %d, current UID %d)", stat.Uid, currentUID)
+	currentGID := uint32(os.Getgid())
+	
+	// Check ownership - TTY should be owned by current user OR root (for system terminals)
+	// Also allow if owned by current user's group (common in some environments)
+	if stat.Uid != currentUID && stat.Uid != 0 && stat.Gid != currentGID {
+		return fmt.Errorf("TTY not owned by current user, root, or current group (owned by UID %d, GID %d, current UID %d, GID %d)", 
+			stat.Uid, stat.Gid, currentUID, currentGID)
 	}
 
-	// Check permissions - TTY should not be world-readable/writable
+	// Check permissions - TTY should not be world-writable (reading might be OK for group/root owned)
 	mode := info.Mode()
+	if mode&0002 != 0 { // Check only world-writable, not world-readable
+		return fmt.Errorf("TTY has unsafe permissions: %v (world-writable)", mode)
+	}
+	
+	// If TTY is owned by root or group, allow group read access
+	if stat.Uid == 0 || stat.Gid == currentGID {
+		// For root or group owned TTYs, only check world-write (0002)
+		return nil
+	}
+	
+	// For user-owned TTYs, be more strict about group/other access
 	if mode&0077 != 0 {
-		return fmt.Errorf("TTY has unsafe permissions: %v (allows group/other access)", mode)
+		return fmt.Errorf("TTY has unsafe permissions: %v (allows group/other access on user-owned TTY)", mode)
 	}
 
 	return nil
@@ -125,8 +140,12 @@ func validateOpenTTY(ttyFile *os.File) error {
 	}
 
 	currentUID := uint32(os.Getuid())
-	if stat.Uid != currentUID {
-		return fmt.Errorf("opened TTY ownership changed (owned by UID %d, current UID %d)", stat.Uid, currentUID)
+	currentGID := uint32(os.Getgid())
+	
+	// Use same relaxed ownership logic as validateTTYSecurity
+	if stat.Uid != currentUID && stat.Uid != 0 && stat.Gid != currentGID {
+		return fmt.Errorf("opened TTY ownership changed (owned by UID %d, GID %d, current UID %d, GID %d)", 
+			stat.Uid, stat.Gid, currentUID, currentGID)
 	}
 
 	return nil
