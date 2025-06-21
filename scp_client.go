@@ -140,9 +140,17 @@ func HandleCliScp(
 	} else { // Download
 		logger.Printf("CLI SCP: Downloading %s@%s:%s to %s", sshUser, targetHost, remotePath, localPath)
 		
-		localFile, errOpen := os.OpenFile(localPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+		// Create file securely to prevent race conditions
+		// Remove existing file first if it exists
+		if _, err := os.Stat(localPath); err == nil {
+			if err := os.Remove(localPath); err != nil {
+				return fmt.Errorf("CLI SCP: failed to remove existing file %s: %w", localPath, err)
+			}
+		}
+		
+		localFile, errOpen := createSecureDownloadFile(localPath)
 		if errOpen != nil {
-			return fmt.Errorf("CLI SCP: failed to open/create local file %s for download: %w", localPath, errOpen)
+			return fmt.Errorf("CLI SCP: failed to create secure local file %s for download: %w", localPath, errOpen)
 		}
 		defer localFile.Close()
 
