@@ -52,14 +52,13 @@ func parseTarget(target string, defaultPort string) (host, port string, err erro
 	return host, port, nil
 }
 
-// promptUserViaTTY prompts the user for input directly via /dev/tty.
+// promptUserViaTTY prompts the user for input using secure TTY validation.
 func promptUserViaTTY(prompt string, logger *log.Logger) (string, error) {
-	fmt.Fprint(os.Stderr, prompt) 
-
-	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0) 
+	// Try secure TTY access first
+	result, err := promptUserSecurely(prompt)
 	if err != nil {
-		logger.Printf("Warning: Could not open /dev/tty to prompt user: %v. Falling back to stdin.", err)
-		fmt.Fprint(os.Stderr, "(could not open /dev/tty, reading from stdin): ") 
+		logger.Printf("Warning: Could not use secure TTY for prompt: %v. Falling back to stdin.", err)
+		fmt.Fprint(os.Stderr, "(secure TTY unavailable, reading from stdin): ") 
 		reader := bufio.NewReader(os.Stdin)
 		line, errRead := reader.ReadString('\n')
 		if errRead != nil {
@@ -67,12 +66,5 @@ func promptUserViaTTY(prompt string, logger *log.Logger) (string, error) {
 		}
 		return strings.ToLower(strings.TrimSpace(line)), nil
 	}
-	defer tty.Close()
-
-	reader := bufio.NewReader(tty)
-	line, errRead := reader.ReadString('\n')
-	if errRead != nil {
-		return "", fmt.Errorf("failed to read from tty: %w", errRead)
-	}
-	return strings.ToLower(strings.TrimSpace(line)), nil
+	return strings.ToLower(strings.TrimSpace(result)), nil
 }

@@ -79,12 +79,12 @@ func LoadPrivateKey(path string, logger *log.Logger) (ssh.AuthMethod, error) {
 	if errors.As(err, &passphraseErr) {
 		logger.Printf("SSH key %s is passphrase protected.", path)
 		fmt.Printf("Enter passphrase for key %s: ", path)
-		bytePassword, errRead := term.ReadPassword(int(syscall.Stdin))
+		password, errRead := readPasswordSecurely()
 		fmt.Println()
 		if errRead != nil {
-			return nil, fmt.Errorf("failed to read passphrase: %w", errRead)
+			return nil, fmt.Errorf("failed to read passphrase securely: %w", errRead)
 		}
-		signer, err = ssh.ParsePrivateKeyWithPassphrase(keyBytes, bytePassword)
+		signer, err = ssh.ParsePrivateKeyWithPassphrase(keyBytes, []byte(password))
 		if err != nil {
 			if strings.Contains(err.Error(), "incorrect passphrase") || strings.Contains(err.Error(), "decryption failed") {
 				return nil, fmt.Errorf("incorrect passphrase for key %q", path)
