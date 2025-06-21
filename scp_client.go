@@ -10,12 +10,10 @@ import (
 	"log"
 	"net"
 	"os/user"
-	"syscall"
 	"time"
 
 	"github.com/bramvdbogaerde/go-scp"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/term" // term is used for password prompt
 	"tailscale.com/tsnet"
 )
 // Removed "fmt" and "os" as they are available from main package context
@@ -65,12 +63,12 @@ func HandleCliScp(
 
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
 		fmt.Print(T("scp_enter_password", sshUser, targetHost))
-		bytePassword, passErr := term.ReadPassword(int(syscall.Stdin))
+		password, passErr := readPasswordSecurely()
 		fmt.Println()
 		if passErr != nil {
-			return "", fmt.Errorf("failed to read password for SCP: %w", passErr)
+			return "", fmt.Errorf("failed to read password securely for SCP: %w", passErr)
 		}
-		return string(bytePassword), nil
+		return password, nil
 	}))
 
 	var hostKeyCallback ssh.HostKeyCallback
