@@ -299,6 +299,9 @@ func registerMessages() {
 	message.SetString(language.English, "flag_key_desc", "Path to SSH private key")
 	message.SetString(language.Spanish, "flag_key_desc", "Ruta a clave privada SSH")
 	
+	message.SetString(language.English, "flag_ssh_config_desc", "SSH configuration file")
+	message.SetString(language.Spanish, "flag_ssh_config_desc", "Archivo de configuración SSH")
+	
 	message.SetString(language.English, "flag_tsnet_desc", "Directory to store tsnet state")
 	message.SetString(language.Spanish, "flag_tsnet_desc", "Directorio para almacenar estado tsnet")
 	

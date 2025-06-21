@@ -70,6 +70,7 @@ func main() {
 	var (
 		sshUser         string
 		sshKeyPath      string
+		sshConfigFile   string
 		tsnetDir        string
 		tsControlURL    string
 		target          string
@@ -108,6 +109,7 @@ func main() {
 	flag.StringVar(&langFlag, "lang", "", T("flag_lang_desc"))
 	flag.StringVar(&sshUser, "l", defaultUser, T("flag_user_desc"))
 	flag.StringVar(&sshKeyPath, "i", defaultKeyPath, T("flag_key_desc"))
+	flag.StringVar(&sshConfigFile, "F", "", T("flag_ssh_config_desc"))
 	flag.StringVar(&tsnetDir, "tsnet-dir", defaultTsnetDir, T("flag_tsnet_desc"))
 	flag.StringVar(&tsControlURL, "control-url", "", T("flag_control_desc"))
 	flag.BoolVar(&verbose, "v", false, T("flag_verbose_desc"))
@@ -303,6 +305,19 @@ func main() {
 		targetHost = parts[1] 
 		if verbose { logger.Printf("SSH target user overridden to '%s' from target string.", sshSpecificUser) }
 	}
+	
+	// Apply SSH config file settings if specified
+	if sshConfigFile != "" {
+		err := applySSHConfigToConnection(sshConfigFile, targetHost, &sshSpecificUser, &sshKeyPath, &insecureHostKey)
+		if err != nil {
+			logger.Printf("Warning: failed to parse SSH config file: %v", err)
+		} else if verbose {
+			logger.Printf("Applied SSH config from: %s", sshConfigFile)
+		}
+	}
+	
+	// Apply process security measures to hide credentials
+	hideCredentialsInProcessList()
 	
 	if verbose {
 		logger.Printf("Starting %s (SSH mode)...", ClientName)

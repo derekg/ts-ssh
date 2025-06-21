@@ -159,6 +159,10 @@ func handleMultiHosts(multiHosts string, logger *log.Logger, sshUser, sshKeyPath
 	}
 
 	tmuxManager := NewTmuxManager(logger, sshUser, sshKeyPath, insecureHostKey)
+	
+	// Ensure cleanup happens on exit
+	defer tmuxManager.cleanupTempConfigFiles()
+	
 	return tmuxManager.StartMultiSession(hosts)
 }
 
