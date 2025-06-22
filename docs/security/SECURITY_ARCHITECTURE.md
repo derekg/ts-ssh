@@ -4,9 +4,9 @@
 
 ts-ssh implements enterprise-grade security measures to protect SSH connections and file transfers over Tailscale networks. This document outlines the comprehensive security architecture, threat model, and implementation details.
 
-## Security Score: 8.5/10 (High Security - Production Ready)
+## Security Assessment: High Security - Production Ready
 
-The application has undergone comprehensive security hardening and meets enterprise compliance requirements (SOC 2, PCI DSS, GDPR).
+The application has undergone comprehensive security hardening with enterprise-grade security measures.
 
 ## Security Architecture Layers
 
@@ -295,4 +295,4 @@ Available for security events including:
 
 **Security Contact**: Report security issues through GitHub security advisories
 
-**Last Updated**: 2025-06-22 (Security Score: 8.5/10)
+**Last Updated**: 2025-06-22
