@@ -6,10 +6,8 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"syscall"
 
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/term"
 )
 
 // Note: SSH key types are now defined in constants.go as ModernKeyTypes
