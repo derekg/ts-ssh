@@ -11,10 +11,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/term"
 	"tailscale.com/ipn/ipnstate"
 	"tailscale.com/tsnet"
 )
@@ -358,18 +356,18 @@ func createSSHAuthMethodsWithMutex(keyPath, user, targetHost string, logger *log
 		}
 	}
 
-	// Add thread-safe password authentication
+	// Add thread-safe password authentication using secure TTY
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
 		authMutex.Lock()
 		defer authMutex.Unlock()
 		
 		fmt.Print(T("enter_password", user, targetHost))
-		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+		password, err := readPasswordSecurely()
 		fmt.Println()
 		if err != nil {
-			return "", fmt.Errorf("failed to read password: %w", err)
+			return "", fmt.Errorf("failed to read password securely: %w", err)
 		}
-		return string(bytePassword), nil
+		return password, nil
 	}))
 
 	return authMethods, nil
