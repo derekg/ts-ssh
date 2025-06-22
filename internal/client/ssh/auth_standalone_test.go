@@ -1,4 +1,4 @@
-package main
+package ssh
 
 import (
 	"crypto/rand"

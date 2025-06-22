@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-package main
+package platform
 
 // maskProcessTitlePlatform sets a process title on Windows
 func maskProcessTitlePlatform(title string) {
