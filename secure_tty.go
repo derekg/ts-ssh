@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"syscall"
 
 	"golang.org/x/term"
 )
@@ -84,46 +83,14 @@ func validateTTYSecurity(ttyPath string) error {
 		return fmt.Errorf("cannot stat TTY: %w", err)
 	}
 
-	// Get file system stat for ownership checks
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		return fmt.Errorf("cannot get TTY ownership information")
+	// Perform platform-specific ownership validation
+	if err := validateTTYOwnership(info, ttyPath); err != nil {
+		return err
 	}
 
-	currentUID := uint32(os.Getuid())
-	currentGID := uint32(os.Getgid())
-	
-	// Check ownership - TTY should be owned by current user OR root (for system terminals)
-	// Also allow if owned by current user's group (common in some environments)
-	if stat.Uid != currentUID && stat.Uid != 0 && stat.Gid != currentGID {
-		return fmt.Errorf("TTY not owned by current user, root, or current group (owned by UID %d, GID %d, current UID %d, GID %d)", 
-			stat.Uid, stat.Gid, currentUID, currentGID)
-	}
-
-	// Check permissions based on TTY type and ownership
-	mode := info.Mode()
-	
-	// For /dev/tty specifically, permissions are often 666 and that's normal
-	// since it's a special device that redirects to the controlling terminal
-	if ttyPath == "/dev/tty" {
-		// /dev/tty is special - it's safe even with wide permissions because
-		// it only gives access to the process's own controlling terminal
-		return nil
-	}
-	
-	// For actual TTY devices (like /dev/pts/0), be more careful about permissions
-	// but still allow common patterns for root-owned TTYs
-	if stat.Uid == 0 {
-		// Root-owned TTYs can have group/other read access but not write
-		if mode&0022 != 0 { // Check group-write and other-write
-			return fmt.Errorf("TTY has unsafe permissions: %v (group/world-writable on root-owned TTY)", mode)
-		}
-		return nil
-	}
-	
-	// For user-owned TTYs, be strict about permissions
-	if mode&0077 != 0 {
-		return fmt.Errorf("TTY has unsafe permissions: %v (allows group/other access on user-owned TTY)", mode)
+	// Perform platform-specific permission validation
+	if err := validateTTYPermissions(info, ttyPath); err != nil {
+		return err
 	}
 
 	return nil
@@ -143,18 +110,9 @@ func validateOpenTTY(ttyFile *os.File) error {
 		return fmt.Errorf("cannot stat opened TTY: %w", err)
 	}
 
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		return fmt.Errorf("cannot get opened TTY ownership information")
-	}
-
-	currentUID := uint32(os.Getuid())
-	currentGID := uint32(os.Getgid())
-	
-	// Use same relaxed ownership logic as validateTTYSecurity
-	if stat.Uid != currentUID && stat.Uid != 0 && stat.Gid != currentGID {
-		return fmt.Errorf("opened TTY ownership changed (owned by UID %d, GID %d, current UID %d, GID %d)", 
-			stat.Uid, stat.Gid, currentUID, currentGID)
+	// Use platform-specific ownership validation
+	if err := validateOpenTTYOwnership(info); err != nil {
+		return err
 	}
 
 	return nil

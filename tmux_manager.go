@@ -174,17 +174,13 @@ func (tm *TmuxManager) buildSecureSSHCommand(host string) (string, string, error
 
 // createTemporarySSHConfig creates a temporary SSH config file with secure permissions
 func (tm *TmuxManager) createTemporarySSHConfig(host string) (string, error) {
-	// Create temporary file with secure permissions
-	tempFile, err := os.CreateTemp("", "ts-ssh-config-*.conf")
-	if err != nil {
-		return "", err
-	}
+	// Generate unique filename for temporary config
+	tempFileName := fmt.Sprintf("/tmp/ts-ssh-config-%s-%s.conf", host, generateRandomSuffix())
 	
-	// Set restrictive permissions immediately to prevent credential exposure
-	if err := tempFile.Chmod(0600); err != nil {
-		tempFile.Close()
-		os.Remove(tempFile.Name())
-		return "", err
+	// Create temporary file with secure permissions atomically
+	tempFile, err := createSecureFile(tempFileName, 0600)
+	if err != nil {
+		return "", fmt.Errorf("failed to create secure temporary SSH config: %w", err)
 	}
 	
 	// Generate SSH config content

@@ -137,6 +137,63 @@ func createSecureDownloadFile(localPath string) (*os.File, error) {
 	return createSecureFile(localPath, 0600)
 }
 
+// createSecureDownloadFileWithReplace creates a temporary file for SCP download 
+// Returns the file and a function to complete the atomic replacement
+func createSecureDownloadFileWithReplace(localPath string) (*os.File, error) {
+	// Create temporary file in same directory to ensure atomic move is possible
+	tempPath := localPath + ".tmp." + generateRandomSuffix()
+	
+	// Create temporary file with secure permissions
+	file, err := createSecureFile(tempPath, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary download file: %w", err)
+	}
+	
+	// Store the paths for later atomic replacement
+	atomicReplaceFiles[file] = atomicReplaceInfo{
+		tempPath:  tempPath,
+		finalPath: localPath,
+	}
+	
+	return file, nil
+}
+
+// atomicReplaceInfo stores paths for atomic replacement
+type atomicReplaceInfo struct {
+	tempPath  string
+	finalPath string
+}
+
+// Global map to track files that need atomic replacement
+// This is a simple approach - in production you might want a more sophisticated solution
+var atomicReplaceFiles = make(map[*os.File]atomicReplaceInfo)
+
+// completeAtomicReplacement performs atomic replacement for a file
+func completeAtomicReplacement(file *os.File) error {
+	info, exists := atomicReplaceFiles[file]
+	if !exists {
+		// Not an atomic file, just close normally
+		return file.Close()
+	}
+	
+	// Remove from tracking map
+	delete(atomicReplaceFiles, file)
+	
+	// Close the file first
+	if err := file.Close(); err != nil {
+		os.Remove(info.tempPath) // Cleanup temp file
+		return fmt.Errorf("failed to close temporary file before rename: %w", err)
+	}
+	
+	// Perform atomic rename
+	if err := os.Rename(info.tempPath, info.finalPath); err != nil {
+		os.Remove(info.tempPath) // Clean up temp file
+		return fmt.Errorf("failed to atomically replace file: %w", err)
+	}
+	
+	return nil
+}
+
 // generateRandomSuffix generates a random suffix for temporary files
 func generateRandomSuffix() string {
 	bytes := make([]byte, 8)

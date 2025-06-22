@@ -138,19 +138,16 @@ func HandleCliScp(
 	} else { // Download
 		logger.Printf("CLI SCP: Downloading %s@%s:%s to %s", sshUser, targetHost, remotePath, localPath)
 		
-		// Create file securely to prevent race conditions
-		// Remove existing file first if it exists
-		if _, err := os.Stat(localPath); err == nil {
-			if err := os.Remove(localPath); err != nil {
-				return fmt.Errorf("CLI SCP: failed to remove existing file %s: %w", localPath, err)
-			}
-		}
-		
-		localFile, errOpen := createSecureDownloadFile(localPath)
+		// Create file securely with atomic replacement to prevent race conditions
+		localFile, errOpen := createSecureDownloadFileWithReplace(localPath)
 		if errOpen != nil {
 			return fmt.Errorf("CLI SCP: failed to create secure local file %s for download: %w", localPath, errOpen)
 		}
-		defer localFile.Close()
+		defer func() {
+			if err := completeAtomicReplacement(localFile); err != nil {
+				logger.Printf("Warning: failed to complete atomic file replacement: %v", err)
+			}
+		}()
 
 		errCopy := scpCl.CopyFromRemote(ctx, localFile, remotePath)
 		if errCopy != nil {
