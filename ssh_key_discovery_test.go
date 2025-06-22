@@ -148,13 +148,13 @@ func TestModernKeyTypes(t *testing.T) {
 		"id_rsa",      // Legacy but still supported
 	}
 
-	if len(modernKeyTypes) != len(expected) {
-		t.Errorf("Expected %d key types, got %d", len(expected), len(modernKeyTypes))
+	if len(ModernKeyTypes) != len(expected) {
+		t.Errorf("Expected %d key types, got %d", len(expected), len(ModernKeyTypes))
 	}
 
 	for i, keyType := range expected {
-		if i >= len(modernKeyTypes) || modernKeyTypes[i] != keyType {
-			t.Errorf("Expected key type %d to be %s, got %s", i, keyType, modernKeyTypes[i])
+		if i >= len(ModernKeyTypes) || ModernKeyTypes[i] != keyType {
+			t.Errorf("Expected key type %d to be %s, got %s", i, keyType, ModernKeyTypes[i])
 		}
 	}
 }

@@ -12,11 +12,17 @@ import (
 	"golang.org/x/term"
 )
 
-// Modern SSH key types in order of preference (most secure first)
-var modernKeyTypes = []string{
-	"id_ed25519",     // Ed25519 - fastest, most secure, smallest
-	"id_ecdsa",       // ECDSA - good performance, secure
-	"id_rsa",         // RSA - legacy, still supported but deprecated
+// Note: SSH key types are now defined in constants.go as ModernKeyTypes
+
+// logSafe safely logs a message only if logger is not nil
+func logSafe(logger *log.Logger, message string, args ...interface{}) {
+	if logger != nil {
+		if len(args) > 0 {
+			logger.Printf(message, args...)
+		} else {
+			logger.Print(message)
+		}
+	}
 }
 
 // discoverSSHKey finds the best available SSH private key in the user's .ssh directory
@@ -24,9 +30,7 @@ var modernKeyTypes = []string{
 // Returns the path to the best available key, or empty string if none found
 func discoverSSHKey(homeDir string, logger *log.Logger) string {
 	if homeDir == "" {
-		if logger != nil {
-			logger.Printf("Cannot discover SSH keys: home directory unknown")
-		}
+		logSafe(logger, "Cannot discover SSH keys: home directory unknown")
 		return ""
 	}
 
@@ -34,14 +38,12 @@ func discoverSSHKey(homeDir string, logger *log.Logger) string {
 	
 	// Check if .ssh directory exists
 	if _, err := os.Stat(sshDir); os.IsNotExist(err) {
-		if logger != nil {
-			logger.Printf("SSH directory %s does not exist", sshDir)
-		}
+		logSafe(logger, "SSH directory %s does not exist", sshDir)
 		return ""
 	}
 
 	// Try each key type in order of preference
-	for _, keyType := range modernKeyTypes {
+	for _, keyType := range ModernKeyTypes {
 		keyPath := filepath.Join(sshDir, keyType)
 		
 		// Check if the private key file exists and is readable
@@ -53,23 +55,17 @@ func discoverSSHKey(homeDir string, logger *log.Logger) string {
 			const insecurePerms = groupReadPerm | otherReadPerm
 			
 			if info.Mode().Perm() & insecurePerms == 0 { // Ensure neither group nor others can read
-				if logger != nil {
-					logger.Printf("Found SSH key: %s (type: %s)", keyPath, keyType)
-				}
+				logSafe(logger, "Found SSH key: %s (type: %s)", keyPath, keyType)
 				return keyPath
 			} else {
-				if logger != nil {
-					logger.Printf("Warning: SSH key %s has overly permissive permissions (%o), skipping for security", keyPath, info.Mode().Perm())
-				}
+				logSafe(logger, "Warning: SSH key %s has overly permissive permissions (%o), skipping for security", keyPath, info.Mode().Perm())
 			}
 		}
 	}
 
-	if logger != nil {
-		logger.Printf("No suitable SSH private keys found in %s", sshDir)
-		logger.Printf("Searched for: %v", modernKeyTypes)
-		logger.Printf("Tip: Generate a modern Ed25519 key with: ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519")
-	}
+	logSafe(logger, "No suitable SSH private keys found in %s", sshDir)
+	logSafe(logger, "Searched for: %v", ModernKeyTypes)
+	logSafe(logger, "Tip: Generate a modern Ed25519 key with: ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519")
 	
 	return ""
 }
@@ -78,9 +74,7 @@ func discoverSSHKey(homeDir string, logger *log.Logger) string {
 // or falls back to the Ed25519 default path if no keys are found
 func getDefaultSSHKeyPath(currentUser *user.User, logger *log.Logger) string {
 	if currentUser == nil || currentUser.HomeDir == "" {
-		if logger != nil {
-			logger.Printf("Cannot determine SSH key path: user or home directory unknown")
-		}
+		logSafe(logger, "Cannot determine SSH key path: user or home directory unknown")
 		return ""
 	}
 
@@ -93,10 +87,8 @@ func getDefaultSSHKeyPath(currentUser *user.User, logger *log.Logger) string {
 	// If no keys found, default to Ed25519 path (most modern)
 	// This encourages users to generate modern keys
 	defaultPath := filepath.Join(currentUser.HomeDir, ".ssh", "id_ed25519")
-	if logger != nil {
-		logger.Printf("No SSH keys found, defaulting to %s", defaultPath)
-		logger.Printf("Consider generating an Ed25519 key: ssh-keygen -t ed25519 -f %s", defaultPath)
-	}
+	logSafe(logger, "No SSH keys found, defaulting to %s", defaultPath)
+	logSafe(logger, "Consider generating an Ed25519 key: ssh-keygen -t ed25519 -f %s", defaultPath)
 	
 	return defaultPath
 }
@@ -111,7 +103,7 @@ func LoadBestPrivateKey(homeDir string, logger *log.Logger) (keyPath string, aut
 	sshDir := filepath.Join(homeDir, ".ssh")
 	
 	// Try each key type in order of preference
-	for _, keyType := range modernKeyTypes {
+	for _, keyType := range ModernKeyTypes {
 		keyPath = filepath.Join(sshDir, keyType)
 		
 		// Check if key exists
@@ -122,18 +114,14 @@ func LoadBestPrivateKey(homeDir string, logger *log.Logger) (keyPath string, aut
 		// Try to load the key
 		authMethod, loadErr := LoadPrivateKey(keyPath, logger)
 		if loadErr == nil {
-			if logger != nil {
-				logger.Printf("Successfully loaded SSH key: %s (type: %s)", keyPath, keyType)
-			}
+			logSafe(logger, "Successfully loaded SSH key: %s (type: %s)", keyPath, keyType)
 			return keyPath, authMethod, nil
 		} else {
-			if logger != nil {
-				logger.Printf("Failed to load %s key at %s: %v", keyType, keyPath, loadErr)
-			}
+			logSafe(logger, "Failed to load %s key at %s: %v", keyType, keyPath, loadErr)
 		}
 	}
 
-	return "", nil, fmt.Errorf("no usable SSH private keys found in %s (searched: %v)", sshDir, modernKeyTypes)
+	return "", nil, fmt.Errorf("no usable SSH private keys found in %s (searched: %v)", sshDir, ModernKeyTypes)
 }
 
 // createModernSSHAuthMethods creates authentication methods with automatic key discovery
@@ -146,14 +134,10 @@ func createModernSSHAuthMethods(keyPath, sshUser, targetHost string, currentUser
 		keyAuth, err := LoadPrivateKey(keyPath, logger)
 		if err == nil {
 			authMethods = append(authMethods, keyAuth)
-			if logger != nil {
-				logger.Printf("Using specified key: %s", keyPath)
-			}
+			logSafe(logger, "Using specified key: %s", keyPath)
 		} else {
-			if logger != nil {
-				logger.Printf("Specified key failed to load: %v", err)
-				logger.Printf("Falling back to automatic key discovery...")
-			}
+			logSafe(logger, "Specified key failed to load: %v", err)
+			logSafe(logger, "Falling back to automatic key discovery...")
 		}
 	}
 
@@ -162,13 +146,9 @@ func createModernSSHAuthMethods(keyPath, sshUser, targetHost string, currentUser
 		discoveredKeyPath, keyAuth, err := LoadBestPrivateKey(currentUser.HomeDir, logger)
 		if err == nil && keyAuth != nil {
 			authMethods = append(authMethods, keyAuth)
-			if logger != nil {
-				logger.Printf("Using discovered key: %s", discoveredKeyPath)
-			}
+			logSafe(logger, "Using discovered key: %s", discoveredKeyPath)
 		} else {
-			if logger != nil {
-				logger.Printf("Key discovery failed: %v", err)
-			}
+			logSafe(logger, "Key discovery failed: %v", err)
 		}
 	}
 
@@ -183,10 +163,8 @@ func createModernSSHAuthMethods(keyPath, sshUser, targetHost string, currentUser
 		return string(bytePassword), nil
 	}))
 
-	if logger != nil {
-		logger.Printf("Created %d authentication methods (key-based: %d, password: 1)", 
-			len(authMethods), len(authMethods)-1)
-	}
+	logSafe(logger, "Created %d authentication methods (key-based: %d, password: 1)", 
+		len(authMethods), len(authMethods)-1)
 
 	return authMethods, nil
 }
