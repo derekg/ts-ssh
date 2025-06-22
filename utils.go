@@ -39,13 +39,13 @@ func parseTarget(target string, defaultPort string) (host, port string, err erro
 			port = p
 		} else {
 			if strings.Contains(target, ":") && !strings.HasPrefix(target, "[") {
-				return "", "", fmt.Errorf("invalid host:port format '%s': %w", target, errSplit)
+				return "", "", fmt.Errorf(T("invalid_host_port_format"), target, errSplit)
 			}
 		}
 	}
 
 	if host == "" {
-		return "", "", errors.New("hostname cannot be empty")
+		return "", "", errors.New(T("hostname_cannot_be_empty"))
 	}
 	if port == "" { 
 		port = defaultPort
@@ -53,7 +53,7 @@ func parseTarget(target string, defaultPort string) (host, port string, err erro
 	
 	// Validate that port is numeric
 	if _, err := strconv.Atoi(port); err != nil {
-		return "", "", fmt.Errorf("invalid port number '%s': %w", port, err)
+		return "", "", fmt.Errorf(T("invalid_port_number"), port, err)
 	}
 	
 	return host, port, nil

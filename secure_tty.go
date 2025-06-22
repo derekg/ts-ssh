@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -12,7 +13,7 @@ import (
 func getSecureTTY() (*os.File, error) {
 	// First, verify we're running in a real terminal
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		return nil, fmt.Errorf("not running in a terminal")
+		return nil, errors.New(T("not_running_in_terminal"))
 	}
 
 	// Get TTY path with validation
@@ -23,13 +24,13 @@ func getSecureTTY() (*os.File, error) {
 
 	// Validate TTY security before opening
 	if err := validateTTYSecurity(ttyPath); err != nil {
-		return nil, fmt.Errorf("TTY security validation failed: %w", err)
+		return nil, fmt.Errorf(T("tty_security_validation_failed"), err)
 	}
 
 	// Open TTY with explicit permissions check
 	ttyFile, err := os.OpenFile(ttyPath, os.O_RDWR, 0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open TTY: %w", err)
+		return nil, fmt.Errorf(T("failed_open_tty"), err)
 	}
 
 	// Additional security check after opening

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 // createSecureFile creates a file with secure permissions atomically
@@ -149,11 +150,13 @@ func createSecureDownloadFileWithReplace(localPath string) (*os.File, error) {
 		return nil, fmt.Errorf("failed to create temporary download file: %w", err)
 	}
 	
-	// Store the paths for later atomic replacement
+	// Store the paths for later atomic replacement with thread safety
+	atomicReplaceFilesMutex.Lock()
 	atomicReplaceFiles[file] = atomicReplaceInfo{
 		tempPath:  tempPath,
 		finalPath: localPath,
 	}
+	atomicReplaceFilesMutex.Unlock()
 	
 	return file, nil
 }
@@ -164,20 +167,23 @@ type atomicReplaceInfo struct {
 	finalPath string
 }
 
-// Global map to track files that need atomic replacement
-// This is a simple approach - in production you might want a more sophisticated solution
+// Global map to track files that need atomic replacement with thread safety
+var atomicReplaceFilesMutex sync.RWMutex
 var atomicReplaceFiles = make(map[*os.File]atomicReplaceInfo)
 
 // completeAtomicReplacement performs atomic replacement for a file
 func completeAtomicReplacement(file *os.File) error {
+	atomicReplaceFilesMutex.Lock()
 	info, exists := atomicReplaceFiles[file]
+	if exists {
+		delete(atomicReplaceFiles, file)
+	}
+	atomicReplaceFilesMutex.Unlock()
+	
 	if !exists {
 		// Not an atomic file, just close normally
 		return file.Close()
 	}
-	
-	// Remove from tracking map
-	delete(atomicReplaceFiles, file)
 	
 	// Close the file first
 	if err := file.Close(); err != nil {

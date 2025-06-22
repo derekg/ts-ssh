@@ -88,7 +88,7 @@ func validateInsecureMode(insecureHostKey, forceInsecure bool) error {
 	reader := bufio.NewReader(os.Stdin)
 	response, err := reader.ReadString('\n')
 	if err != nil {
-		return fmt.Errorf("failed to read user input: %w", err)
+		return fmt.Errorf(T("failed_read_user_input"), err)
 	}
 
 	response = strings.ToLower(strings.TrimSpace(response))
@@ -226,7 +226,7 @@ func main() {
 	// Handle power CLI features
 	// Validate insecure mode before any operations
 	if err := validateInsecureMode(insecureHostKey, forceInsecure); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, T("error_prefix")+"\n", err)
 		os.Exit(1)
 	}
 
@@ -252,7 +252,7 @@ func main() {
 		}
 
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, T("error_prefix")+"\n", err)
 			os.Exit(1)
 		}
 		os.Exit(0)
@@ -309,7 +309,7 @@ func main() {
 		// SCP mode is active.
 		// Validate insecure mode
 		if err := validateInsecureMode(insecureHostKey, forceInsecure); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, T("error_prefix")+"\n", err)
 			os.Exit(1)
 		}
 		srv, ctx, _, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose)
@@ -370,7 +370,7 @@ func main() {
 	
 	// Validate insecure mode for regular SSH
 	if err := validateInsecureMode(insecureHostKey, forceInsecure); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, T("error_prefix")+"\n", err)
 		os.Exit(1)
 	}
 	if verbose {

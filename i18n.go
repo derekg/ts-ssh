@@ -357,6 +357,32 @@ func registerMessages() {
 	message.SetString(language.English, "scp_download_complete", "CLI SCP: Download complete.")
 	message.SetString(language.Spanish, "scp_download_complete", "CLI SCP: Descarga completada.")
 	
+	// Common error messages
+	message.SetString(language.English, "error_prefix", "Error: %v")
+	message.SetString(language.Spanish, "error_prefix", "Error: %v")
+	
+	message.SetString(language.English, "failed_read_user_input", "failed to read user input: %w")
+	message.SetString(language.Spanish, "failed_read_user_input", "error al leer entrada del usuario: %w")
+	
+	message.SetString(language.English, "hostname_cannot_be_empty", "hostname cannot be empty")
+	message.SetString(language.Spanish, "hostname_cannot_be_empty", "el nombre del servidor no puede estar vacío")
+	
+	message.SetString(language.English, "invalid_port_number", "invalid port number '%s': %w")
+	message.SetString(language.Spanish, "invalid_port_number", "número de puerto inválido '%s': %w")
+	
+	message.SetString(language.English, "invalid_host_port_format", "invalid host:port format '%s': %w")
+	message.SetString(language.Spanish, "invalid_host_port_format", "formato servidor:puerto inválido '%s': %w")
+	
+	// TTY and security messages
+	message.SetString(language.English, "not_running_in_terminal", "not running in a terminal")
+	message.SetString(language.Spanish, "not_running_in_terminal", "no se está ejecutando en una terminal")
+	
+	message.SetString(language.English, "tty_security_validation_failed", "TTY security validation failed: %w")
+	message.SetString(language.Spanish, "tty_security_validation_failed", "falló la validación de seguridad TTY: %w")
+	
+	message.SetString(language.English, "failed_open_tty", "failed to open TTY: %w")
+	message.SetString(language.Spanish, "failed_open_tty", "error al abrir TTY: %w")
+	
 	// Security warning messages for insecure mode
 	message.SetString(language.English, "warning_insecure_mode", "Host key verification disabled!")
 	message.SetString(language.Spanish, "warning_insecure_mode", "¡Verificación de clave de servidor deshabilitada!")
