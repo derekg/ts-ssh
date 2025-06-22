@@ -36,8 +36,9 @@ func NewInputValidator() *InputValidator {
 		MaxHostnameLength: MaxHostnameLength,
 		MaxPathLength:     MaxPathLength,
 		MaxCommandLength:  MaxCommandLength,
-		// Simplified hostname validation to prevent ReDoS attacks
-		AllowedHostChars: regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-.]{0,251}[a-zA-Z0-9]$|^[a-zA-Z0-9]$`),
+		// Simple hostname validation to prevent ReDoS attacks
+		// Removed complex alternation to prevent exponential backtracking
+		AllowedHostChars: regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$`),
 		// Safe path characters (no shell metacharacters)
 		AllowedPathChars: regexp.MustCompile(`^[a-zA-Z0-9._/\-]+$`),
 	}
@@ -239,6 +240,26 @@ func (iv *InputValidator) SanitizeShellArg(arg string) string {
 	return strconv.Quote(arg)
 }
 
+// ValidateWindowName validates tmux window names with appropriate restrictions
+func (iv *InputValidator) ValidateWindowName(windowName string) error {
+	if windowName == "" {
+		return fmt.Errorf("window name cannot be empty")
+	}
+	
+	if len(windowName) > 64 {
+		return fmt.Errorf("window name too long: %d characters (max 64)", len(windowName))
+	}
+	
+	// Window names should be safe for tmux and shell usage
+	// Allow alphanumeric, hyphens, underscores, and basic safe characters
+	validWindowRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+	if !validWindowRegex.MatchString(windowName) {
+		return fmt.Errorf("window name contains invalid characters (only alphanumeric, hyphen, underscore allowed)")
+	}
+	
+	return nil
+}
+
 // ValidateEnvironmentVariable validates environment variable names and values
 func (iv *InputValidator) ValidateEnvironmentVariable(name, value string) error {
 	if name == "" {
@@ -302,4 +323,24 @@ func ValidatePort(port string) error {
 
 func SanitizeShellArg(arg string) string {
 	return DefaultValidator.SanitizeShellArg(arg)
+}
+
+// ValidateWindowName validates tmux window names with appropriate restrictions
+func ValidateWindowName(windowName string) error {
+	if windowName == "" {
+		return fmt.Errorf("window name cannot be empty")
+	}
+	
+	if len(windowName) > 64 {
+		return fmt.Errorf("window name too long: %d characters (max 64)", len(windowName))
+	}
+	
+	// Window names should be safe for tmux and shell usage
+	// Allow alphanumeric, hyphens, underscores, and basic safe characters
+	validWindowRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+	if !validWindowRegex.MatchString(windowName) {
+		return fmt.Errorf("window name contains invalid characters (only alphanumeric, hyphen, underscore allowed)")
+	}
+	
+	return nil
 }

@@ -151,7 +151,7 @@ func (tm *TmuxManager) addWindow(windowName, host string) error {
 // sendKeysToWindow sends a command to a specific tmux window
 func (tm *TmuxManager) sendKeysToWindow(windowName, command string) error {
 	// SECURITY: Validate window name to prevent injection
-	if err := security.ValidateSSHUser(windowName); err != nil {
+	if err := security.ValidateWindowName(windowName); err != nil {
 		return fmt.Errorf("window name validation failed: %w", err)
 	}
 	
@@ -200,13 +200,35 @@ func (tm *TmuxManager) createTemporarySSHConfig(host string) (string, error) {
 		return "", fmt.Errorf("hostname validation failed: %w", err)
 	}
 	
-	// Generate unique filename for temporary config using secure random suffix
-	// Use filepath.Base to ensure only the filename part is used (prevent path traversal)
+	// Generate secure filename for temporary config using multiple sanitization layers
+	// First, use filepath.Base to strip any path components (prevent directory traversal)
 	safeHostname := filepath.Base(host)
-	// Replace any remaining dangerous characters
-	safeHostname = strings.ReplaceAll(safeHostname, ":", "_")
-	safeHostname = strings.ReplaceAll(safeHostname, "@", "_")
-	// Limit length to prevent filesystem issues
+	
+	// Remove or replace ALL potentially dangerous characters for filesystem safety
+	// This is more comprehensive than just : and @
+	dangerousChars := ":@/\\<>|*?\"'"
+	for _, char := range dangerousChars {
+		safeHostname = strings.ReplaceAll(safeHostname, string(char), "_")
+	}
+	
+	// Remove any control characters or non-printable characters
+	var cleanHostname strings.Builder
+	for _, r := range safeHostname {
+		if r >= 32 && r <= 126 { // Only allow printable ASCII
+			cleanHostname.WriteRune(r)
+		} else {
+			cleanHostname.WriteRune('_')
+		}
+	}
+	safeHostname = cleanHostname.String()
+	
+	// Ensure we don't start with dangerous characters like dots or hyphens
+	safeHostname = strings.TrimLeft(safeHostname, ".-_")
+	if safeHostname == "" {
+		safeHostname = "host" // Fallback if hostname becomes empty after sanitization
+	}
+	
+	// Limit length to prevent filesystem issues (50 chars is reasonable for temp files)
 	if len(safeHostname) > 50 {
 		safeHostname = safeHostname[:50]
 	}

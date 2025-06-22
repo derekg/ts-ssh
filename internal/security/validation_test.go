@@ -363,6 +363,8 @@ func TestConvenienceFunctions(t *testing.T) {
 		{"ValidateSSHUser_invalid", func() error { return ValidateSSHUser("my user") }, true},
 		{"ValidatePort_valid", func() error { return ValidatePort("22") }, false},
 		{"ValidatePort_invalid", func() error { return ValidatePort("abc") }, true},
+		{"ValidateWindowName_valid", func() error { return ValidateWindowName("ssh-1") }, false},
+		{"ValidateWindowName_invalid", func() error { return ValidateWindowName("ssh window") }, true},
 	}
 
 	for _, tt := range tests {
@@ -381,6 +383,49 @@ func TestConvenienceFunctions(t *testing.T) {
 	expected := `"test arg"`
 	if result != expected {
 		t.Errorf("SanitizeShellArg convenience function failed: got %s, expected %s", result, expected)
+	}
+}
+
+func TestValidateWindowName(t *testing.T) {
+	validator := NewInputValidator()
+
+	tests := []struct {
+		name        string
+		windowName  string
+		expectError bool
+		errorMsg    string
+	}{
+		// Valid window names
+		{"valid_simple", "ssh-1", false, ""},
+		{"valid_with_underscore", "ssh_window", false, ""},
+		{"valid_with_numbers", "window123", false, ""},
+		{"valid_mixed", "ssh-window_1", false, ""},
+
+		// Invalid window names
+		{"empty_window_name", "", true, "cannot be empty"},
+		{"too_long", strings.Repeat("a", 65), true, "too long"},
+		{"invalid_chars_space", "ssh window", true, "invalid characters"},
+		{"invalid_chars_special", "ssh@window", true, "invalid characters"},
+		{"invalid_chars_dot", "ssh.window", true, "invalid characters"},
+		{"invalid_chars_slash", "ssh/window", true, "invalid characters"},
+		{"invalid_chars_colon", "ssh:window", true, "invalid characters"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validator.ValidateWindowName(tt.windowName)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error for window name %s, but got none", tt.windowName)
+				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("Expected error containing '%s', got '%s'", tt.errorMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error for window name %s, but got: %v", tt.windowName, err)
+				}
+			}
+		})
 	}
 }
 
