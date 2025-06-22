@@ -111,17 +111,10 @@ func CreateKnownHostsCallback(currentUser *user.User, logger *log.Logger) (ssh.H
 	}
 
 	knownHostsPath := filepath.Join(currentUser.HomeDir, ".ssh", "known_hosts")
-	sshDir := filepath.Dir(knownHostsPath)
 
-	if err := os.MkdirAll(sshDir, 0700); err != nil {
-		logger.Printf("Failed to create .ssh directory %s: %v. Known_hosts persistence may fail.", sshDir, err)
-	}
-
-	f, err := os.OpenFile(knownHostsPath, os.O_CREATE|os.O_RDWR, 0600)
-	if err != nil {
-		logger.Printf("Unable to create/open %s: %v. Host key management will be impaired.", knownHostsPath, err)
-	} else {
-		f.Close() 
+	// Create known_hosts file securely to prevent race conditions
+	if err := createSecureKnownHostsFile(knownHostsPath); err != nil {
+		logger.Printf("Unable to create secure known_hosts file %s: %v. Host key management will be impaired.", knownHostsPath, err)
 	}
 
 	hostKeyCallback, err := knownhosts.New(knownHostsPath)
