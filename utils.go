@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	// "golang.org/x/term" // Not used in this file
+	"github.com/derekg/ts-ssh/internal/security"
 )
 
 // parseTarget takes a string like "host", "host:port", or "[ipv6host]:port"
@@ -62,7 +62,7 @@ func parseTarget(target string, defaultPort string) (host, port string, err erro
 // promptUserViaTTY prompts the user for input using secure TTY validation.
 func promptUserViaTTY(prompt string, logger *log.Logger) (string, error) {
 	// Try secure TTY access first
-	result, err := promptUserSecurely(prompt)
+	result, err := security.PromptUserSecurely(prompt)
 	if err != nil {
 		logger.Printf("Warning: Could not use secure TTY for prompt: %v. Falling back to stdin.", err)
 		fmt.Fprint(os.Stderr, "(secure TTY unavailable, reading from stdin): ") 

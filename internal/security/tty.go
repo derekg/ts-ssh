@@ -8,6 +8,25 @@ import (
 	"golang.org/x/term"
 )
 
+// Simple T function for temporary internationalization support
+// TODO: Replace with proper i18n integration
+func T(key string, args ...interface{}) string {
+	// Basic English translations for now
+	translations := map[string]string{
+		"tty_path_validation_failed": "TTY path validation failed",
+		"tty_ownership_check_failed": "TTY ownership check failed",
+		"tty_permission_check_failed": "TTY permission check failed",
+	}
+	
+	if msg, ok := translations[key]; ok {
+		if len(args) > 0 {
+			return fmt.Sprintf(msg, args...)
+		}
+		return msg
+	}
+	return key // fallback to key if no translation
+}
+
 // getSecureTTY validates and opens a secure TTY connection
 // This prevents TTY hijacking and input redirection attacks
 func getSecureTTY() (*os.File, error) {
@@ -119,8 +138,8 @@ func validateOpenTTY(ttyFile *os.File) error {
 	return nil
 }
 
-// readPasswordSecurely reads a password from a secure TTY connection
-func readPasswordSecurely() (string, error) {
+// ReadPasswordSecurely reads a password from a secure TTY connection
+func ReadPasswordSecurely() (string, error) {
 	tty, err := getSecureTTY()
 	if err != nil {
 		// Fallback to stdin if secure TTY is not available
@@ -179,7 +198,7 @@ func withSecureTTY(fn func(*os.File) error) error {
 }
 
 // promptUserSecurely prompts the user for input using a secure TTY
-func promptUserSecurely(prompt string) (string, error) {
+func PromptUserSecurely(prompt string) (string, error) {
 	var result string
 	var readErr error
 

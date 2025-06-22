@@ -119,9 +119,9 @@ func TestCreateSSHSession(t *testing.T) {
 	// This test would require a real SSH client connection
 	// For now, test the function signature and nil handling
 	t.Run("nil client", func(t *testing.T) {
-		_, err := createSSHSession(nil)
+		_, err := CreateSSHSession(nil)
 		if err == nil {
-			t.Error("createSSHSession() should return error for nil client")
+			t.Error("CreateSSHSession() should return error for nil client")
 		}
 	})
 }

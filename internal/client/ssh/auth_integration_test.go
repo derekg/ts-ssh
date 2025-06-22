@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -344,6 +345,11 @@ func canRunSSHTests() bool {
 // createTestLogger creates a logger for testing
 func createTestLogger() *log.Logger {
 	return createQuietLogger() // Use quiet logger to avoid noise in tests
+}
+
+// createQuietLogger creates a logger that discards output for testing
+func createQuietLogger() *log.Logger {
+	return log.New(io.Discard, "", 0)
 }
 
 // TestSSHConnectionHelpers tests SSH connection helper functions

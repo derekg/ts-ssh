@@ -45,15 +45,15 @@ func TestCreateSecureFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fullPath := filepath.Join(tempDir, tt.filename)
 			
-			file, err := createSecureFile(fullPath, tt.mode)
+			file, err := CreateSecureFile(fullPath, tt.mode)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("createSecureFile() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CreateSecureFile() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
 			if !tt.wantErr {
 				if file == nil {
-					t.Error("createSecureFile() returned nil file but no error")
+					t.Error("CreateSecureFile() returned nil file but no error")
 					return
 				}
 				defer file.Close()
@@ -88,16 +88,16 @@ func TestCreateSecureFileForAppend(t *testing.T) {
 	testFile := filepath.Join(tempDir, "append-test.txt")
 
 	// First call should create the file
-	file1, err := createSecureFileForAppend(testFile, 0600)
+	file1, err := CreateSecureFileForAppend(testFile, 0600)
 	if err != nil {
-		t.Fatalf("First createSecureFileForAppend() failed: %v", err)
+		t.Fatalf("First CreateSecureFileForAppend() failed: %v", err)
 	}
 	file1.Close()
 
 	// Second call should open existing file
-	file2, err := createSecureFileForAppend(testFile, 0600)
+	file2, err := CreateSecureFileForAppend(testFile, 0600)
 	if err != nil {
-		t.Fatalf("Second createSecureFileForAppend() failed: %v", err)
+		t.Fatalf("Second CreateSecureFileForAppend() failed: %v", err)
 	}
 	file2.Close()
 
@@ -123,9 +123,9 @@ func TestCreateSecureKnownHostsFile(t *testing.T) {
 	knownHostsPath := filepath.Join(sshDir, "known_hosts")
 
 	// Test creating known_hosts file
-	err = createSecureKnownHostsFile(knownHostsPath)
+	err = CreateSecureKnownHostsFile(knownHostsPath)
 	if err != nil {
-		t.Fatalf("createSecureKnownHostsFile() failed: %v", err)
+		t.Fatalf("CreateSecureKnownHostsFile() failed: %v", err)
 	}
 
 	// Verify SSH directory was created with correct permissions
@@ -160,9 +160,9 @@ func TestCreateSecureKnownHostsFile(t *testing.T) {
 	}
 
 	// Test calling again on existing file
-	err = createSecureKnownHostsFile(knownHostsPath)
+	err = CreateSecureKnownHostsFile(knownHostsPath)
 	if err != nil {
-		t.Errorf("createSecureKnownHostsFile() should succeed on existing file: %v", err)
+		t.Errorf("CreateSecureKnownHostsFile() should succeed on existing file: %v", err)
 	}
 }
 
@@ -270,20 +270,20 @@ func TestCreateSecureDownloadFile(t *testing.T) {
 
 func TestGenerateRandomSuffix(t *testing.T) {
 	// Test that function returns a non-empty string
-	suffix := generateRandomSuffix()
+	suffix := GenerateRandomSuffix()
 	if suffix == "" {
-		t.Error("generateRandomSuffix() returned empty string")
+		t.Error("GenerateRandomSuffix() returned empty string")
 	}
 
 	// Test that multiple calls return different values
-	suffix2 := generateRandomSuffix()
+	suffix2 := GenerateRandomSuffix()
 	if suffix == suffix2 {
-		t.Error("generateRandomSuffix() returned same value twice (very unlikely)")
+		t.Error("GenerateRandomSuffix() returned same value twice (very unlikely)")
 	}
 
 	// Test suffix length is reasonable
 	if len(suffix) < 4 {
-		t.Errorf("generateRandomSuffix() returned too short suffix: %q", suffix)
+		t.Errorf("GenerateRandomSuffix() returned too short suffix: %q", suffix)
 	}
 }
 
@@ -304,9 +304,9 @@ func TestCreateSecureDownloadFileWithReplace(t *testing.T) {
 	}
 
 	// Use atomic download file replacement
-	atomicFile, err := createSecureDownloadFileWithReplace(downloadFile)
+	atomicFile, err := CreateSecureDownloadFileWithReplace(downloadFile)
 	if err != nil {
-		t.Fatalf("createSecureDownloadFileWithReplace() failed: %v", err)
+		t.Fatalf("CreateSecureDownloadFileWithReplace() failed: %v", err)
 	}
 
 	// Write new content
@@ -317,7 +317,7 @@ func TestCreateSecureDownloadFileWithReplace(t *testing.T) {
 	}
 
 	// Complete atomic replacement
-	err = completeAtomicReplacement(atomicFile)
+	err = CompleteAtomicReplacement(atomicFile)
 	if err != nil {
 		t.Fatalf("Failed to complete atomic replacement: %v", err)
 	}
@@ -353,9 +353,9 @@ func TestAtomicDownloadFileCleanupOnError(t *testing.T) {
 	downloadFile := filepath.Join(tempDir, "cleanup-test.txt")
 
 	// Create atomic file but don't close it properly
-	atomicFile, err := createSecureDownloadFileWithReplace(downloadFile)
+	atomicFile, err := CreateSecureDownloadFileWithReplace(downloadFile)
 	if err != nil {
-		t.Fatalf("createSecureDownloadFileWithReplace() failed: %v", err)
+		t.Fatalf("CreateSecureDownloadFileWithReplace() failed: %v", err)
 	}
 
 	// Write some content
@@ -365,7 +365,7 @@ func TestAtomicDownloadFileCleanupOnError(t *testing.T) {
 	}
 
 	// Complete atomic replacement
-	err = completeAtomicReplacement(atomicFile)
+	err = CompleteAtomicReplacement(atomicFile)
 	if err != nil {
 		t.Fatalf("Failed to complete atomic replacement: %v", err)
 	}
@@ -392,7 +392,7 @@ func TestSecureFileOperationsConcurrency(t *testing.T) {
 	// Start two goroutines trying to create the same file
 	for i := 0; i < 2; i++ {
 		go func() {
-			file, err := createSecureFile(testFile, 0600)
+			file, err := CreateSecureFile(testFile, 0600)
 			if err == nil {
 				file.Close()
 			}

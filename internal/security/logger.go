@@ -9,6 +9,9 @@ import (
 	"time"
 )
 
+// version represents the application version for logging
+var version = "0.4.0"
+
 // SecurityEvent represents a security-relevant event for audit logging
 type SecurityEvent struct {
 	Timestamp   time.Time `json:"timestamp"`
@@ -34,8 +37,8 @@ type SecurityLogger struct {
 // Global security logger instance
 var securityLogger *SecurityLogger
 
-// initSecurityLogger initializes the security audit logging system
-func initSecurityLogger() error {
+// InitSecurityLogger initializes the security audit logging system
+func InitSecurityLogger() error {
 	// Check if security logging is enabled via environment variable
 	enabled := os.Getenv("TS_SSH_SECURITY_AUDIT") != ""
 	if !enabled {
@@ -55,7 +58,7 @@ func initSecurityLogger() error {
 	}
 
 	// Create secure log file with appropriate permissions
-	logFile, err := createSecureFileForAppend(logPath, 0600)
+	logFile, err := CreateSecureFileForAppend(logPath, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to create security audit log: %w", err)
 	}
@@ -81,8 +84,8 @@ func initSecurityLogger() error {
 	return nil
 }
 
-// closeSecurityLogger safely closes the security logger
-func closeSecurityLogger() {
+// CloseSecurityLogger safely closes the security logger
+func CloseSecurityLogger() {
 	if securityLogger != nil && securityLogger.enabled && securityLogger.logFile != nil {
 		securityLogger.logSecurityEvent(SecurityEvent{
 			EventType: "AUDIT_CLOSE",

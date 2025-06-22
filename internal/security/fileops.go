@@ -10,7 +10,7 @@ import (
 
 // createSecureFile creates a file with secure permissions atomically
 // to prevent race conditions between file creation and permission setting
-func createSecureFile(filename string, mode os.FileMode) (*os.File, error) {
+func CreateSecureFile(filename string, mode os.FileMode) (*os.File, error) {
 	// Create file with restrictive permissions atomically
 	// Use O_EXCL to ensure we create a new file and fail if it already exists
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
@@ -36,7 +36,7 @@ func createSecureFile(filename string, mode os.FileMode) (*os.File, error) {
 }
 
 // createSecureFileForAppend creates or opens a file for appending with secure permissions
-func createSecureFileForAppend(filename string, mode os.FileMode) (*os.File, error) {
+func CreateSecureFileForAppend(filename string, mode os.FileMode) (*os.File, error) {
 	// First, try to open existing file
 	if _, err := os.Stat(filename); err == nil {
 		// File exists, verify its permissions
@@ -48,11 +48,11 @@ func createSecureFileForAppend(filename string, mode os.FileMode) (*os.File, err
 	}
 	
 	// File doesn't exist, create it securely
-	return createSecureFile(filename, mode)
+	return CreateSecureFile(filename, mode)
 }
 
-// createSecureKnownHostsFile creates a known_hosts file with secure permissions
-func createSecureKnownHostsFile(knownHostsPath string) error {
+// CreateSecureKnownHostsFile creates a known_hosts file with secure permissions
+func CreateSecureKnownHostsFile(knownHostsPath string) error {
 	// Ensure parent directory exists with secure permissions
 	dir := filepath.Dir(knownHostsPath)
 	if err := os.MkdirAll(dir, 0700); err != nil {
@@ -60,7 +60,7 @@ func createSecureKnownHostsFile(knownHostsPath string) error {
 	}
 	
 	// Create known_hosts file atomically with secure permissions
-	file, err := createSecureFileForAppend(knownHostsPath, 0600)
+	file, err := CreateSecureFileForAppend(knownHostsPath, 0600)
 	if err != nil {
 		if os.IsExist(err) {
 			// File already exists, verify permissions
@@ -95,9 +95,9 @@ func verifyFilePermissions(filename string, expectedMode os.FileMode) error {
 // secureFileCopy performs a secure file copy with atomic operations
 func secureFileCopy(src, dst string, mode os.FileMode) error {
 	// Create temporary file with secure permissions
-	tempFile := dst + ".tmp." + generateRandomSuffix()
+	tempFile := dst + ".tmp." + GenerateRandomSuffix()
 	
-	file, err := createSecureFile(tempFile, mode)
+	file, err := CreateSecureFile(tempFile, mode)
 	if err != nil {
 		return err
 	}
@@ -135,17 +135,17 @@ func secureFileCopy(src, dst string, mode os.FileMode) error {
 func createSecureDownloadFile(localPath string) (*os.File, error) {
 	// For downloads, we want to create the file with secure permissions initially
 	// and allow the user to adjust them later if needed
-	return createSecureFile(localPath, 0600)
+	return CreateSecureFile(localPath, 0600)
 }
 
-// createSecureDownloadFileWithReplace creates a temporary file for SCP download 
+// CreateSecureDownloadFileWithReplace creates a temporary file for SCP download 
 // Returns the file and a function to complete the atomic replacement
-func createSecureDownloadFileWithReplace(localPath string) (*os.File, error) {
+func CreateSecureDownloadFileWithReplace(localPath string) (*os.File, error) {
 	// Create temporary file in same directory to ensure atomic move is possible
-	tempPath := localPath + ".tmp." + generateRandomSuffix()
+	tempPath := localPath + ".tmp." + GenerateRandomSuffix()
 	
 	// Create temporary file with secure permissions
-	file, err := createSecureFile(tempPath, 0600)
+	file, err := CreateSecureFile(tempPath, 0600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary download file: %w", err)
 	}
@@ -171,8 +171,8 @@ type atomicReplaceInfo struct {
 var atomicReplaceFilesMutex sync.RWMutex
 var atomicReplaceFiles = make(map[*os.File]atomicReplaceInfo)
 
-// completeAtomicReplacement performs atomic replacement for a file
-func completeAtomicReplacement(file *os.File) error {
+// CompleteAtomicReplacement performs atomic replacement for a file
+func CompleteAtomicReplacement(file *os.File) error {
 	atomicReplaceFilesMutex.Lock()
 	info, exists := atomicReplaceFiles[file]
 	if exists {
@@ -201,7 +201,7 @@ func completeAtomicReplacement(file *os.File) error {
 }
 
 // generateRandomSuffix generates a random suffix for temporary files
-func generateRandomSuffix() string {
+func GenerateRandomSuffix() string {
 	bytes := make([]byte, 8)
 	if _, err := rand.Read(bytes); err != nil {
 		// Fallback to simpler method if crypto/rand fails

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"golang.org/x/term"
+
+	"github.com/derekg/ts-ssh/internal/security"
 )
 
 // TmuxManager handles creating and managing tmux sessions for SSH connections
@@ -175,10 +177,10 @@ func (tm *TmuxManager) buildSecureSSHCommand(host string) (string, string, error
 // createTemporarySSHConfig creates a temporary SSH config file with secure permissions
 func (tm *TmuxManager) createTemporarySSHConfig(host string) (string, error) {
 	// Generate unique filename for temporary config
-	tempFileName := fmt.Sprintf("/tmp/ts-ssh-config-%s-%s.conf", host, generateRandomSuffix())
+	tempFileName := fmt.Sprintf("/tmp/ts-ssh-config-%s-%s.conf", host, security.GenerateRandomSuffix())
 	
 	// Create temporary file with secure permissions atomically
-	tempFile, err := createSecureFile(tempFileName, 0600)
+	tempFile, err := security.CreateSecureFile(tempFileName, 0600)
 	if err != nil {
 		return "", fmt.Errorf("failed to create secure temporary SSH config: %w", err)
 	}

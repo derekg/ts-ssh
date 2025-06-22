@@ -14,6 +14,9 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
 	"tailscale.com/tsnet"
+
+	"github.com/derekg/ts-ssh/internal/client/scp"
+	sshclient "github.com/derekg/ts-ssh/internal/client/ssh"
 )
 
 // AppConfig holds all the configuration for the application
@@ -226,7 +229,7 @@ func handleSCPOperation(scpArgs *scpArgs, config *AppConfig) error {
 		currentUser = &user.User{Username: config.SSHUser}
 	}
 
-	err = HandleCliScp(srv, ctx, config.Logger, scpArgs.sshUser, config.SSHKeyPath,
+	err = scp.HandleCliScp(srv, ctx, config.Logger, scpArgs.sshUser, config.SSHKeyPath,
 					  config.InsecureHostKey, currentUser, scpArgs.localPath,
 					  scpArgs.remotePath, scpArgs.targetHost, true, config.Verbose)
 
@@ -279,7 +282,7 @@ func handleSSHOperation(config *AppConfig) error {
 	}
 
 	// Establish SSH connection
-	sshConfig := SSHConnectionConfig{
+	sshConfig := sshclient.SSHConnectionConfig{
 		User:            sshSpecificUser,
 		KeyPath:         config.SSHKeyPath,
 		TargetHost:      targetHost,
@@ -290,7 +293,7 @@ func handleSSHOperation(config *AppConfig) error {
 		Logger:          config.Logger,
 	}
 
-	client, err := establishSSHConnection(srv, nonTuiCtx, sshConfig)
+	client, err := sshclient.EstablishSSHConnection(srv, nonTuiCtx, sshConfig)
 	if err != nil {
 		return fmt.Errorf("failed to establish SSH connection: %w", err)
 	}
@@ -324,7 +327,7 @@ func handleProxyCommand(srv *tsnet.Server, ctx context.Context, forwardDest stri
 // executeRemoteCommand executes a command on the remote host and returns
 func executeRemoteCommand(client *ssh.Client, remoteCmd []string, logger *log.Logger) error {
 	logger.Printf("Running remote command: %v", remoteCmd)
-	session, err := createSSHSession(client)
+	session, err := sshclient.CreateSSHSession(client)
 	if err != nil {
 		return fmt.Errorf("failed to create SSH session for remote command: %w", err)
 	}
@@ -349,7 +352,7 @@ func executeRemoteCommand(client *ssh.Client, remoteCmd []string, logger *log.Lo
 // startInteractiveSession starts an interactive SSH session with PTY support
 func startInteractiveSession(client *ssh.Client, logger *log.Logger) error {
 	logger.Println("Starting interactive SSH session...")
-	session, err := createSSHSession(client)
+	session, err := sshclient.CreateSSHSession(client)
 	if err != nil {
 		return fmt.Errorf("failed to create SSH session: %w", err)
 	}

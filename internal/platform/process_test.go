@@ -122,8 +122,8 @@ func TestSetSecureEnvironment(t *testing.T) {
 	os.Setenv("SSH_AGENT_PID", "12345")
 	os.Setenv("DISPLAY", ":0")
 
-	// Call setSecureEnvironment
-	setSecureEnvironment()
+	// Call SetSecureEnvironment
+	SetSecureEnvironment()
 
 	// Verify sensitive variables were cleared
 	sensitiveVars := []string{"SSH_AUTH_SOCK", "SSH_AGENT_PID", "DISPLAY"}
@@ -160,17 +160,17 @@ func TestHideCredentialsInProcessList(t *testing.T) {
 	// Test that function doesn't panic
 	defer func() {
 		if r := recover(); r != nil {
-			t.Errorf("hideCredentialsInProcessList() panicked: %v", r)
+			t.Errorf("HideCredentialsInProcessList() panicked: %v", r)
 		}
 	}()
 
-	hideCredentialsInProcessList()
+	HideCredentialsInProcessList()
 
 	// Verify sensitive variables were cleared
 	sensitiveVars := []string{"SSH_AUTH_SOCK", "SSH_AGENT_PID", "DISPLAY"}
 	for _, varName := range sensitiveVars {
 		if value := os.Getenv(varName); value != "" {
-			t.Errorf("Environment variable %s was not cleared by hideCredentialsInProcessList: %s", varName, value)
+			t.Errorf("Environment variable %s was not cleared by HideCredentialsInProcessList: %s", varName, value)
 		}
 	}
 }
@@ -201,7 +201,7 @@ func TestProcessSecurityIntegration(t *testing.T) {
 	os.Setenv("DISPLAY", ":0.0")
 
 	// Apply comprehensive process security
-	hideCredentialsInProcessList()
+	HideCredentialsInProcessList()
 
 	// Verify all sensitive data was cleared
 	for varName := range originalEnv {
@@ -251,7 +251,7 @@ func TestProcessSecurityCrossPlatform(t *testing.T) {
 			}
 		}()
 
-		hideCredentialsInProcessList()
+		HideCredentialsInProcessList()
 	})
 }
 
@@ -269,7 +269,7 @@ func BenchmarkSetSecureEnvironment(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		setSecureEnvironment()
+		SetSecureEnvironment()
 		
 		// Reset for next iteration
 		os.Setenv("SSH_AUTH_SOCK", "/tmp/bench-test")

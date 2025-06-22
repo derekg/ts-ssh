@@ -18,6 +18,11 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
+
+	"github.com/derekg/ts-ssh/internal/client/scp"
+	sshclient "github.com/derekg/ts-ssh/internal/client/ssh"
+	"github.com/derekg/ts-ssh/internal/platform"
+	"github.com/derekg/ts-ssh/internal/security"
 )
 
 // scpArgs holds parsed arguments for an SCP operation.
@@ -81,7 +86,7 @@ func validateInsecureMode(insecureHostKey, forceInsecure bool, host, user string
 	if forceInsecure {
 		fmt.Fprint(os.Stderr, T("insecure_mode_forced")+"\n")
 		// Log forced insecure mode usage
-		LogInsecureModeUsage(host, user, true, true)
+		security.LogInsecureModeUsage(host, user, true, true)
 		return nil
 	}
 
@@ -97,7 +102,7 @@ func validateInsecureMode(insecureHostKey, forceInsecure bool, host, user string
 	confirmed := response == "y" || response == "yes"
 	
 	// Log insecure mode usage with user decision
-	LogInsecureModeUsage(host, user, false, confirmed)
+	security.LogInsecureModeUsage(host, user, false, confirmed)
 	
 	if !confirmed {
 		return fmt.Errorf("%s", T("connection_cancelled_by_user"))
@@ -139,7 +144,7 @@ func main() {
 	// Use modern SSH key discovery that prioritizes Ed25519 over RSA
 	defaultKeyPath := ""
 	if currentUser != nil {
-		defaultKeyPath = getDefaultSSHKeyPath(currentUser, nil) // nil logger for now since it's not initialized yet
+		defaultKeyPath = sshclient.GetDefaultSSHKeyPath(currentUser, nil) // nil logger for now since it's not initialized yet
 	}
 	defaultTsnetDir := ""
 	if currentUser != nil {
@@ -219,11 +224,11 @@ func main() {
 	initI18n(langFlag)
 
 	// Initialize security audit logging (if enabled via environment variables)
-	if err := initSecurityLogger(); err != nil {
+	if err := security.InitSecurityLogger(); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: Failed to initialize security audit logging: %v\n", err)
 	}
 	// Ensure security logger is properly closed on exit
-	defer closeSecurityLogger()
+	defer security.CloseSecurityLogger()
 
 	var logger *log.Logger
 	if verbose {
@@ -333,7 +338,7 @@ func main() {
 		}
 		defer srv.Close()
 		
-		err = HandleCliScp(srv, ctx, logger, detectedScpArgs.sshUser, sshKeyPath, insecureHostKey, currentUser,
+		err = scp.HandleCliScp(srv, ctx, logger, detectedScpArgs.sshUser, sshKeyPath, insecureHostKey, currentUser,
 			detectedScpArgs.localPath, detectedScpArgs.remotePath, detectedScpArgs.targetHost,
 			detectedScpArgs.isUpload, verbose)
 
@@ -371,7 +376,7 @@ func main() {
 	
 	// Apply SSH config file settings if specified
 	if sshConfigFile != "" {
-		err := applySSHConfigToConnection(sshConfigFile, targetHost, &sshSpecificUser, &sshKeyPath, &insecureHostKey)
+		err := sshclient.ApplySSHConfigToConnection(sshConfigFile, targetHost, &sshSpecificUser, &sshKeyPath, &insecureHostKey)
 		if err != nil {
 			logger.Printf("Warning: failed to parse SSH config file: %v", err)
 		} else if verbose {
@@ -380,7 +385,7 @@ func main() {
 	}
 	
 	// Apply process security measures to hide credentials
-	hideCredentialsInProcessList()
+	platform.HideCredentialsInProcessList()
 	
 	// Validate insecure mode for regular SSH
 	if err := validateInsecureMode(insecureHostKey, forceInsecure, targetHost, sshSpecificUser); err != nil {
@@ -435,7 +440,7 @@ func main() {
 	logger.Printf("tsnet potentially initialized. Attempting SSH connection to %s@%s:%s", sshSpecificUser, targetHost, targetPort)
 
 	// Use the new helper function for SSH connection setup
-	sshConfig := SSHConnectionConfig{
+	sshConfig := sshclient.SSHConnectionConfig{
 		User:            sshSpecificUser,
 		KeyPath:         sshKeyPath,
 		TargetHost:      targetHost,
@@ -446,7 +451,7 @@ func main() {
 		Logger:          logger,
 	}
 
-	client, err := establishSSHConnection(srv, nonTuiCtx, sshConfig)
+	client, err := sshclient.EstablishSSHConnection(srv, nonTuiCtx, sshConfig)
 	if err != nil {
 		log.Fatalf("Failed to establish SSH connection: %v", err)
 	}
@@ -454,7 +459,7 @@ func main() {
 
 	if len(remoteCmd) > 0 {
 		logger.Printf("Running remote command: %v", remoteCmd)
-		session, errSession := createSSHSession(client)
+		session, errSession := sshclient.CreateSSHSession(client)
 		if errSession != nil {
 			log.Fatalf("Failed to create SSH session for remote command: %v", errSession)
 		}
@@ -473,7 +478,7 @@ func main() {
 	}
 
 	logger.Println("Starting interactive SSH session...")
-	session, err := createSSHSession(client)
+	session, err := sshclient.CreateSSHSession(client)
 	if err != nil {
 		log.Fatalf("Failed to create SSH session: %v", err)
 	}
@@ -515,7 +520,7 @@ func main() {
 			log.Fatalf("Failed to request pseudo-terminal: %v", errPty)
 		}
 		if runtime.GOOS != "windows" {
-			go watchWindowSize(fd, session, nonTuiCtx, logger)
+			go sshclient.WatchWindowSize(fd, session, nonTuiCtx, logger)
 		}
 	}
 

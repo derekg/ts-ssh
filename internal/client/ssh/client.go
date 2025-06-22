@@ -18,14 +18,33 @@ import (
 	"golang.org/x/crypto/ssh/knownhosts"
 	"golang.org/x/term"
 	"tailscale.com/tsnet"
+
+	"github.com/derekg/ts-ssh/internal/security"
 )
+
+// Temporary stub functions - TODO: Move proper implementations from main package
+func startInteractiveSession(client *ssh.Client, logger *log.Logger) error {
+	// This is a temporary stub - the real implementation is in main_helpers.go
+	// TODO: Move the full implementation here or create proper cross-package access
+	logger.Println("Interactive session not yet fully refactored in internal package")
+	return fmt.Errorf("interactive session temporarily disabled during refactoring")
+}
+
+func promptUserViaTTY(prompt string, logger *log.Logger) (string, error) {
+	// This is a temporary stub - the real implementation is in utils.go
+	// TODO: Move the full implementation here or create proper cross-package access
+	fmt.Print(prompt)
+	var response string
+	_, err := fmt.Scanln(&response)
+	return response, err
+}
 
 // defaultSSHPort is defined in main.go (or should be made accessible globally)
 // For now, we assume it's accessible or HandleCliScp will use its own.
 
-// connectToHost handles SSH connection and starts an interactive session
+// ConnectToHost handles SSH connection and starts an interactive session
 // This replaces the old TUI-specific connection logic with standardized SSH helpers
-func connectToHost(
+func ConnectToHost(
 	srv *tsnet.Server,
 	appCtx context.Context, 
 	logger *log.Logger,
@@ -49,7 +68,7 @@ func connectToHost(
 	}
 
 	// Establish SSH connection using standardized helper
-	client, err := establishSSHConnection(srv, appCtx, sshConfig)
+	client, err := EstablishSSHConnection(srv, appCtx, sshConfig)
 	if err != nil {
 		return fmt.Errorf("failed to establish SSH connection: %w", err)
 	}
@@ -79,7 +98,7 @@ func LoadPrivateKey(path string, logger *log.Logger) (ssh.AuthMethod, error) {
 	if errors.As(err, &passphraseErr) {
 		logger.Printf("SSH key %s is passphrase protected.", path)
 		fmt.Printf("Enter passphrase for key %s: ", path)
-		password, errRead := readPasswordSecurely()
+		password, errRead := security.ReadPasswordSecurely()
 		fmt.Println()
 		if errRead != nil {
 			return nil, fmt.Errorf("failed to read passphrase securely: %w", errRead)
@@ -113,7 +132,7 @@ func CreateKnownHostsCallback(currentUser *user.User, logger *log.Logger) (ssh.H
 	knownHostsPath := filepath.Join(currentUser.HomeDir, ".ssh", "known_hosts")
 
 	// Create known_hosts file securely to prevent race conditions
-	if err := createSecureKnownHostsFile(knownHostsPath); err != nil {
+	if err := security.CreateSecureKnownHostsFile(knownHostsPath); err != nil {
 		logger.Printf("Unable to create secure known_hosts file %s: %v. Host key management will be impaired.", knownHostsPath, err)
 	}
 
@@ -239,7 +258,7 @@ func getSigWinch() os.Signal {
 	return syscall.Signal(0x1c) // SIGWINCH value on most Unix systems
 }
 
-func watchWindowSize(fd int, session *ssh.Session, ctx context.Context, logger *log.Logger) {
+func WatchWindowSize(fd int, session *ssh.Session, ctx context.Context, logger *log.Logger) {
 	// Window resize monitoring is limited on some platforms
 	if runtime.GOOS == "windows" {
 		logger.Println("Window resize monitoring not supported on Windows")

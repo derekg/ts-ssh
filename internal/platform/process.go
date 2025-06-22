@@ -15,9 +15,9 @@ func maskProcessTitle(title string) {
 	maskProcessTitlePlatform(title)
 }
 
-// setSecureEnvironment clears potentially sensitive environment variables
+// SetSecureEnvironment clears potentially sensitive environment variables
 // and sets up a clean environment for SSH operations
-func setSecureEnvironment() {
+func SetSecureEnvironment() {
 	// Clear potentially sensitive environment variables
 	sensitiveVars := []string{
 		"SSH_AUTH_SOCK",    // Don't inherit SSH agent
@@ -30,12 +30,12 @@ func setSecureEnvironment() {
 	}
 }
 
-// hideCredentialsInProcessList applies various techniques to prevent
+// HideCredentialsInProcessList applies various techniques to prevent
 // credential exposure in process lists
-func hideCredentialsInProcessList() {
+func HideCredentialsInProcessList() {
 	// Set generic process title
 	maskProcessTitle("ts-ssh [secure]")
 	
 	// Clean environment of sensitive variables
-	setSecureEnvironment()
+	SetSecureEnvironment()
 }

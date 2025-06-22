@@ -15,6 +15,10 @@ import (
 	"golang.org/x/crypto/ssh"
 	"tailscale.com/ipn/ipnstate"
 	"tailscale.com/tsnet"
+
+	"github.com/derekg/ts-ssh/internal/client/scp"
+	sshclient "github.com/derekg/ts-ssh/internal/client/ssh"
+	"github.com/derekg/ts-ssh/internal/security"
 )
 
 // handleListHosts lists all available Tailscale hosts
@@ -137,7 +141,7 @@ func handlePickHost(srv *tsnet.Server, ctx context.Context, status *ipnstate.Sta
 	fmt.Println(T("connecting_to", selectedHost))
 
 	// Connect to selected host
-	return connectToHost(srv, ctx, logger, selectedHost, sshUser, sshKeyPath, insecureHostKey, currentUser, verbose)
+	return sshclient.ConnectToHost(srv, ctx, logger, selectedHost, sshUser, sshKeyPath, insecureHostKey, currentUser, verbose)
 }
 
 // handleMultiHosts starts a tmux session with multiple hosts
@@ -211,7 +215,7 @@ func handleCopyFiles(srv *tsnet.Server, ctx context.Context, copyFiles string, l
 		fmt.Println(T("copying_to", localFile, host, remotePath))
 		
 		// Use our existing SCP logic
-		err := HandleCliScp(srv, ctx, logger, sshUser, sshKeyPath, insecureHostKey, nil,
+		err := scp.HandleCliScp(srv, ctx, logger, sshUser, sshKeyPath, insecureHostKey, nil,
 			localFile, remotePath, host, true, verbose)
 		
 		if err != nil {
@@ -305,7 +309,7 @@ func executeCommandOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host 
 	}
 
 	// Create SSH config using standard helpers
-	sshConfig := SSHConnectionConfig{
+	sshConfig := sshclient.SSHConnectionConfig{
 		User:            effectiveUser,
 		KeyPath:         sshKeyPath,
 		TargetHost:      targetHost,
@@ -335,7 +339,7 @@ func executeCommandOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host 
 	}
 
 	// Use standard SSH helper for non-parallel execution
-	client, err := establishSSHConnection(srv, ctx, sshConfig)
+	client, err := sshclient.EstablishSSHConnection(srv, ctx, sshConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to establish SSH connection: %w", err)
 	}
@@ -350,7 +354,7 @@ func createSSHAuthMethodsWithMutex(keyPath, user, targetHost string, logger *log
 
 	// Try to load SSH key if provided
 	if keyPath != "" {
-		keyAuth, err := LoadPrivateKey(keyPath, logger)
+		keyAuth, err := sshclient.LoadPrivateKey(keyPath, logger)
 		if err == nil {
 			authMethods = append(authMethods, keyAuth)
 		}
@@ -362,7 +366,7 @@ func createSSHAuthMethodsWithMutex(keyPath, user, targetHost string, logger *log
 		defer authMutex.Unlock()
 		
 		fmt.Print(T("enter_password", user, targetHost))
-		password, err := readPasswordSecurely()
+		password, err := security.ReadPasswordSecurely()
 		fmt.Println()
 		if err != nil {
 			return "", fmt.Errorf("failed to read password securely: %w", err)

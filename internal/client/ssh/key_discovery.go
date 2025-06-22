@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 
 	"golang.org/x/crypto/ssh"
+
+	"github.com/derekg/ts-ssh/internal/security"
 )
 
 // Note: SSH key types are now defined in constants.go as ModernKeyTypes
@@ -68,9 +70,9 @@ func discoverSSHKey(homeDir string, logger *log.Logger) string {
 	return ""
 }
 
-// getDefaultSSHKeyPath returns the path to the best available SSH key
+// GetDefaultSSHKeyPath returns the path to the best available SSH key
 // or falls back to the Ed25519 default path if no keys are found
-func getDefaultSSHKeyPath(currentUser *user.User, logger *log.Logger) string {
+func GetDefaultSSHKeyPath(currentUser *user.User, logger *log.Logger) string {
 	if currentUser == nil || currentUser.HomeDir == "" {
 		logSafe(logger, "Cannot determine SSH key path: user or home directory unknown")
 		return ""
@@ -152,8 +154,8 @@ func createModernSSHAuthMethods(keyPath, sshUser, targetHost string, currentUser
 
 	// Add password authentication as fallback using secure TTY
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		fmt.Print(T("enter_password", sshUser, targetHost))
-		password, err := readPasswordSecurely()
+		fmt.Printf("Enter password for %s@%s: ", sshUser, targetHost)
+		password, err := security.ReadPasswordSecurely()
 		fmt.Println()
 		if err != nil {
 			return "", fmt.Errorf("failed to read password securely: %w", err)

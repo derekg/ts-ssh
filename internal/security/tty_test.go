@@ -129,13 +129,13 @@ func TestReadPasswordSecurely(t *testing.T) {
 	t.Run("fallback when no TTY available", func(t *testing.T) {
 		// We can't easily test the success case without interactive input
 		// But we can test that the function exists and handles errors gracefully
-		_, err := readPasswordSecurely()
+		_, err := ReadPasswordSecurely()
 		// Error is expected if we're not in an interactive terminal
 		// or if TTY validation fails - this is correct behavior
 		if err == nil {
-			t.Log("readPasswordSecurely() succeeded (likely running in interactive terminal)")
+			t.Log("ReadPasswordSecurely() succeeded (likely running in interactive terminal)")
 		} else {
-			t.Logf("readPasswordSecurely() failed as expected in non-interactive environment: %v", err)
+			t.Logf("ReadPasswordSecurely() failed as expected in non-interactive environment: %v", err)
 		}
 	})
 }
@@ -146,12 +146,12 @@ func TestPromptUserSecurely(t *testing.T) {
 	}
 
 	// Test with non-interactive environment
-	_, err := promptUserSecurely("Test prompt: ")
+	_, err := PromptUserSecurely("Test prompt: ")
 	// Error is expected if we're not in an interactive terminal
 	if err == nil {
-		t.Log("promptUserSecurely() succeeded (likely running in interactive terminal)")
+		t.Log("PromptUserSecurely() succeeded (likely running in interactive terminal)")
 	} else {
-		t.Logf("promptUserSecurely() failed as expected in non-interactive environment: %v", err)
+		t.Logf("PromptUserSecurely() failed as expected in non-interactive environment: %v", err)
 	}
 }
 

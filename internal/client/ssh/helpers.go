@@ -6,10 +6,51 @@ import (
 	"log"
 	"net"
 	"os/user"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 	"tailscale.com/tsnet"
 )
+
+// Constants needed by SSH package
+const (
+	DefaultSshPort = "22"
+)
+
+// SSH key discovery constants
+var (
+	// ModernKeyTypes defines SSH key types in order of preference (most secure first).
+	// Ed25519 keys provide the best security and performance, followed by ECDSA,
+	// with RSA maintained for backward compatibility only.
+	ModernKeyTypes = []string{
+		"id_ed25519", // Ed25519 - fastest, most secure, smallest key size
+		"id_ecdsa",   // ECDSA - good performance, secure elliptic curve
+		"id_rsa",     // RSA - legacy support, discouraged for new keys
+	}
+)
+
+// Timeout constants
+const (
+	DefaultSSHTimeout = 15 * time.Second
+)
+
+// Simple T function for temporary internationalization support
+// TODO: Replace with proper i18n integration
+func T(key string, args ...interface{}) string {
+	translations := map[string]string{
+		"host_key_warning": "WARNING: Host key verification is disabled",
+		"dial_via_tsnet": "Connecting via tsnet...",
+		"ssh_handshake": "Performing SSH handshake...",
+	}
+	
+	if msg, ok := translations[key]; ok {
+		if len(args) > 0 {
+			return fmt.Sprintf(msg, args...)
+		}
+		return msg
+	}
+	return key
+}
 
 // SSHConnectionConfig holds all the parameters needed for SSH connection setup
 type SSHConnectionConfig struct {
@@ -96,7 +137,7 @@ func createSSHConfig(config SSHConnectionConfig) (*ssh.ClientConfig, error) {
 //   4. Returning ready-to-use SSH client
 //
 // Returns an active ssh.Client that must be closed by the caller.
-func establishSSHConnection(srv *tsnet.Server, ctx context.Context, config SSHConnectionConfig) (*ssh.Client, error) {
+func EstablishSSHConnection(srv *tsnet.Server, ctx context.Context, config SSHConnectionConfig) (*ssh.Client, error) {
 	// Create SSH configuration
 	sshConfig, err := createSSHConfig(config)
 	if err != nil {
@@ -132,9 +173,9 @@ func establishSSHConnection(srv *tsnet.Server, ctx context.Context, config SSHCo
 	return client, nil
 }
 
-// createSSHSession creates an SSH session with standard configuration
+// CreateSSHSession creates an SSH session with standard configuration
 // This standardizes session creation across different use cases
-func createSSHSession(client *ssh.Client) (*ssh.Session, error) {
+func CreateSSHSession(client *ssh.Client) (*ssh.Session, error) {
 	if client == nil {
 		return nil, fmt.Errorf("SSH client cannot be nil")
 	}

@@ -34,7 +34,7 @@ func TestSSHKeyDiscovery(t *testing.T) {
 		}
 
 		// Test default path suggestion
-		defaultPath := getDefaultSSHKeyPath(&user.User{HomeDir: tempHome}, logger)
+		defaultPath := GetDefaultSSHKeyPath(&user.User{HomeDir: tempHome}, logger)
 		expectedDefault := filepath.Join(tempHome, ".ssh", "id_ed25519")
 		if defaultPath != expectedDefault {
 			t.Errorf("Expected default path %s, got %s", expectedDefault, defaultPath)
@@ -169,7 +169,7 @@ func TestKeyDiscoveryDocumentation(t *testing.T) {
 		defer os.RemoveAll(tempHome)
 
 		// When no keys exist, should recommend Ed25519
-		defaultPath := getDefaultSSHKeyPath(&user.User{HomeDir: tempHome}, nil)
+		defaultPath := GetDefaultSSHKeyPath(&user.User{HomeDir: tempHome}, nil)
 		expectedPath := filepath.Join(tempHome, ".ssh", "id_ed25519")
 		
 		if defaultPath != expectedPath {

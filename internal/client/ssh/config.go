@@ -105,8 +105,8 @@ func parseSSHConfig(configPath, hostname string) (*SSHConfigOptions, error) {
 	return options, nil
 }
 
-// applySSHConfigToConnection applies SSH config file options to connection parameters
-func applySSHConfigToConnection(configFile, hostname string, sshUser, sshKeyPath *string, insecureHostKey *bool) error {
+// ApplySSHConfigToConnection applies SSH config file options to connection parameters
+func ApplySSHConfigToConnection(configFile, hostname string, sshUser, sshKeyPath *string, insecureHostKey *bool) error {
 	if configFile == "" {
 		return nil // No config file specified
 	}

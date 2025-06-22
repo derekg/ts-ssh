@@ -3,9 +3,7 @@ package scp
 import (
 	"fmt"
 	"os"
-	// "path/filepath" // Removed as it's not used
-
-	"context" // Keep one context import
+	"context"
 	"errors"
 	"log"
 	"net"
@@ -15,7 +13,35 @@ import (
 	"github.com/bramvdbogaerde/go-scp"
 	"golang.org/x/crypto/ssh"
 	"tailscale.com/tsnet"
+
+	sshclient "github.com/derekg/ts-ssh/internal/client/ssh"
+	"github.com/derekg/ts-ssh/internal/security"
 )
+
+// Constants needed by SCP package
+const (
+	DefaultSshPort = "22"
+)
+
+// Simple T function for temporary internationalization support
+// TODO: Replace with proper i18n integration
+func T(key string, args ...interface{}) string {
+	translations := map[string]string{
+		"scp_empty_path": "SCP path cannot be empty",
+		"scp_enter_password": "Enter password for %s@%s: ",
+		"dial_via_tsnet": "Connecting via tsnet...",
+		"dial_failed": "Connection failed",
+		"scp_host_key_warning": "WARNING: SCP host key verification disabled",
+	}
+	
+	if msg, ok := translations[key]; ok {
+		if len(args) > 0 {
+			return fmt.Sprintf(msg, args...)
+		}
+		return msg
+	}
+	return key
+}
 // Removed "fmt" and "os" as they are available from main package context
 // Removed "golang.org/x/crypto/ssh/knownhosts" as it's not directly used here
 // Removed "path/filepath" as it's not used
@@ -50,7 +76,7 @@ func HandleCliScp(
 	var authMethods []ssh.AuthMethod
 	if sshKeyPath != "" {
 		// Call the exported function from ssh_client.go
-		keyAuth, keyErr := LoadPrivateKey(sshKeyPath, logger) 
+		keyAuth, keyErr := sshclient.LoadPrivateKey(sshKeyPath, logger) 
 		if keyErr == nil {
 			authMethods = append(authMethods, keyAuth)
 			logger.Printf("CLI SCP: Using public key authentication: %s", sshKeyPath)
@@ -63,7 +89,7 @@ func HandleCliScp(
 
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
 		fmt.Print(T("scp_enter_password", sshUser, targetHost))
-		password, passErr := readPasswordSecurely()
+		password, passErr := security.ReadPasswordSecurely()
 		fmt.Println()
 		if passErr != nil {
 			return "", fmt.Errorf("failed to read password securely for SCP: %w", passErr)
@@ -78,7 +104,7 @@ func HandleCliScp(
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	} else {
 		// Call the exported function from ssh_client.go
-		hostKeyCallback, hkErr = CreateKnownHostsCallback(currentUser, logger)
+		hostKeyCallback, hkErr = sshclient.CreateKnownHostsCallback(currentUser, logger)
 		if hkErr != nil {
 			return fmt.Errorf("CLI SCP: Could not set up host key verification: %w", hkErr)
 		}
@@ -139,12 +165,12 @@ func HandleCliScp(
 		logger.Printf("CLI SCP: Downloading %s@%s:%s to %s", sshUser, targetHost, remotePath, localPath)
 		
 		// Create file securely with atomic replacement to prevent race conditions
-		localFile, errOpen := createSecureDownloadFileWithReplace(localPath)
+		localFile, errOpen := security.CreateSecureDownloadFileWithReplace(localPath)
 		if errOpen != nil {
 			return fmt.Errorf("CLI SCP: failed to create secure local file %s for download: %w", localPath, errOpen)
 		}
 		defer func() {
-			if err := completeAtomicReplacement(localFile); err != nil {
+			if err := security.CompleteAtomicReplacement(localFile); err != nil {
 				logger.Printf("Warning: failed to complete atomic file replacement: %v", err)
 			}
 		}()
