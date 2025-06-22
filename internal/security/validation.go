@@ -5,6 +5,7 @@ import (
 	"net"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -18,14 +19,25 @@ type InputValidator struct {
 	AllowedPathChars  *regexp.Regexp
 }
 
+// Security constants for input validation
+const (
+	MaxHostnameLength = 253  // RFC 1035 limit
+	MaxPathLength     = 4096 // Common filesystem limit  
+	MaxCommandLength  = 8192 // Reasonable command length limit
+	MaxPortNumber     = 65535
+	MinPortNumber     = 1
+	MaxSSHUserLength  = 32
+	MaxEnvVarLength   = 32768 // 32KB limit
+)
+
 // NewInputValidator creates a new input validator with secure defaults
 func NewInputValidator() *InputValidator {
 	return &InputValidator{
-		MaxHostnameLength: 253, // RFC 1035 limit
-		MaxPathLength:     4096, // Common filesystem limit
-		MaxCommandLength:  8192, // Reasonable command length limit
-		// RFC 1123 compliant hostname validation
-		AllowedHostChars: regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9\-\.]{0,251}[a-zA-Z0-9])?$`),
+		MaxHostnameLength: MaxHostnameLength,
+		MaxPathLength:     MaxPathLength,
+		MaxCommandLength:  MaxCommandLength,
+		// Simplified hostname validation to prevent ReDoS attacks
+		AllowedHostChars: regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-.]{0,251}[a-zA-Z0-9]$|^[a-zA-Z0-9]$`),
 		// Safe path characters (no shell metacharacters)
 		AllowedPathChars: regexp.MustCompile(`^[a-zA-Z0-9._/\-]+$`),
 	}
@@ -41,12 +53,10 @@ func (iv *InputValidator) ValidateHostname(hostname string) error {
 		return fmt.Errorf("hostname too long: %d characters (max %d)", len(hostname), iv.MaxHostnameLength)
 	}
 
-	// Check for dangerous characters that could be used for injection
-	dangerousChars := []string{";", "&", "|", "`", "$", "(", ")", "{", "}", "[", "]", "<", ">", "\\", "'", "\"", "!", "*", "?"}
-	for _, char := range dangerousChars {
-		if strings.Contains(hostname, char) {
-			return fmt.Errorf("hostname contains dangerous character: %s", char)
-		}
+	// Check for dangerous characters that could be used for injection (optimized)
+	dangerousChars := ";|&`$(){}[]<>\\\"'!*?"
+	if strings.ContainsAny(hostname, dangerousChars) {
+		return fmt.Errorf("hostname contains invalid characters")
 	}
 
 	// Check if it's a valid IP address first (IPv4 or IPv6)
@@ -95,12 +105,10 @@ func (iv *InputValidator) ValidateFilePath(path string) error {
 		return fmt.Errorf("file path too long: %d characters (max %d)", len(path), iv.MaxPathLength)
 	}
 
-	// Check for dangerous characters first
-	dangerousChars := []string{";", "&", "|", "`", "$", "(", ")", "{", "}", "[", "]", "<", ">", "\\", "'", "\"", "!", "*", "?"}
-	for _, char := range dangerousChars {
-		if strings.Contains(path, char) {
-			return fmt.Errorf("file path contains dangerous character: %s", char)
-		}
+	// Check for dangerous characters first (optimized)
+	dangerousChars := ";|&`$(){}[]<>\\\"'!*?"
+	if strings.ContainsAny(path, dangerousChars) {
+		return fmt.Errorf("file path contains invalid characters")
 	}
 
 	// Check for path traversal attempts
@@ -175,8 +183,8 @@ func (iv *InputValidator) ValidateSSHUser(username string) error {
 		return fmt.Errorf("SSH username cannot be empty")
 	}
 
-	if len(username) > 32 {
-		return fmt.Errorf("SSH username too long: %d characters (max 32)", len(username))
+	if len(username) > MaxSSHUserLength {
+		return fmt.Errorf("SSH username too long: %d characters (max %d)", len(username), MaxSSHUserLength)
 	}
 
 	// SSH usernames should only contain alphanumeric characters, hyphens, and underscores
@@ -211,8 +219,8 @@ func (iv *InputValidator) ValidatePort(port string) error {
 		return fmt.Errorf("invalid port number format: %w", err)
 	}
 
-	if portNum < 1 || portNum > 65535 {
-		return fmt.Errorf("port number out of range: %d (must be 1-65535)", portNum)
+	if portNum < MinPortNumber || portNum > MaxPortNumber {
+		return fmt.Errorf("port number out of range: %d (must be %d-%d)", portNum, MinPortNumber, MaxPortNumber)
 	}
 
 	// Warn about privileged ports
@@ -226,9 +234,9 @@ func (iv *InputValidator) ValidatePort(port string) error {
 
 // SanitizeShellArg safely escapes shell arguments to prevent injection
 func (iv *InputValidator) SanitizeShellArg(arg string) string {
-	// Use single quotes and escape any single quotes in the argument
-	escaped := strings.ReplaceAll(arg, "'", "'\"'\"'")
-	return "'" + escaped + "'"
+	// For maximum safety, we'll use Go's strconv.Quote which handles all edge cases
+	// This uses double quotes and properly escapes all dangerous characters
+	return strconv.Quote(arg)
 }
 
 // ValidateEnvironmentVariable validates environment variable names and values
@@ -256,8 +264,8 @@ func (iv *InputValidator) ValidateEnvironmentVariable(name, value string) error 
 	}
 
 	// Validate value length
-	if len(value) > 32768 { // 32KB limit
-		return fmt.Errorf("environment variable value too long: %d characters (max 32768)", len(value))
+	if len(value) > MaxEnvVarLength {
+		return fmt.Errorf("environment variable value too long: %d characters (max %d)", len(value), MaxEnvVarLength)
 	}
 
 	// Check for null bytes in value

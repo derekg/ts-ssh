@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -149,10 +150,20 @@ func (tm *TmuxManager) addWindow(windowName, host string) error {
 
 // sendKeysToWindow sends a command to a specific tmux window
 func (tm *TmuxManager) sendKeysToWindow(windowName, command string) error {
+	// SECURITY: Validate window name to prevent injection
+	if err := security.ValidateSSHUser(windowName); err != nil {
+		return fmt.Errorf("window name validation failed: %w", err)
+	}
+	
+	// SECURITY: Validate command to prevent injection
+	if err := security.ValidateCommand(command); err != nil {
+		return fmt.Errorf("command validation failed: %w", err)
+	}
+	
 	target := fmt.Sprintf("%s:%s", tm.sessionName, windowName)
 	cmd := exec.Command("tmux", "send-keys", "-t", target, command, "Enter")
 	
-	tm.logger.Printf("Sending to window %s: %s", windowName, command)
+	tm.logger.Printf("Sending to window %s: [command validated]", windowName)
 	
 	return cmd.Run()
 }
@@ -190,9 +201,15 @@ func (tm *TmuxManager) createTemporarySSHConfig(host string) (string, error) {
 	}
 	
 	// Generate unique filename for temporary config using secure random suffix
-	// Use a sanitized version of hostname for the filename
-	safeHostname := strings.ReplaceAll(host, ":", "_")
-	safeHostname = strings.ReplaceAll(safeHostname, "/", "_")
+	// Use filepath.Base to ensure only the filename part is used (prevent path traversal)
+	safeHostname := filepath.Base(host)
+	// Replace any remaining dangerous characters
+	safeHostname = strings.ReplaceAll(safeHostname, ":", "_")
+	safeHostname = strings.ReplaceAll(safeHostname, "@", "_")
+	// Limit length to prevent filesystem issues
+	if len(safeHostname) > 50 {
+		safeHostname = safeHostname[:50]
+	}
 	tempFileName := fmt.Sprintf("/tmp/ts-ssh-config-%s-%s.conf", safeHostname, security.GenerateRandomSuffix())
 	
 	// Create temporary file with secure permissions atomically

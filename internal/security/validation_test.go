@@ -25,20 +25,20 @@ func TestValidateHostname(t *testing.T) {
 		{"valid_numbers", "server1.example.com", false, ""},
 
 		// Invalid hostnames - security threats
-		{"command_injection_semicolon", "server.com;rm -rf /", true, "dangerous character"},
-		{"command_injection_ampersand", "server.com && rm -rf /", true, "dangerous character"},
-		{"command_injection_pipe", "server.com | cat /etc/passwd", true, "dangerous character"},
-		{"command_injection_backtick", "server.com`whoami`", true, "dangerous character"},
-		{"command_injection_dollar", "server.com$(whoami)", true, "dangerous character"},
-		{"command_injection_parens", "server.com()", true, "dangerous character"},
-		{"command_injection_brackets", "server.com[test]", true, "dangerous character"},
-		{"command_injection_braces", "server.com{test}", true, "dangerous character"},
-		{"command_injection_redirect", "server.com>file", true, "dangerous character"},
-		{"command_injection_quotes", "server.com\"test\"", true, "dangerous character"},
-		{"command_injection_single_quote", "server.com'test'", true, "dangerous character"},
-		{"command_injection_exclamation", "server.com!test", true, "dangerous character"},
-		{"command_injection_asterisk", "server.com*", true, "dangerous character"},
-		{"command_injection_question", "server.com?", true, "dangerous character"},
+		{"command_injection_semicolon", "server.com;rm -rf /", true, "invalid characters"},
+		{"command_injection_ampersand", "server.com && rm -rf /", true, "invalid characters"},
+		{"command_injection_pipe", "server.com | cat /etc/passwd", true, "invalid characters"},
+		{"command_injection_backtick", "server.com`whoami`", true, "invalid characters"},
+		{"command_injection_dollar", "server.com$(whoami)", true, "invalid characters"},
+		{"command_injection_parens", "server.com()", true, "invalid characters"},
+		{"command_injection_brackets", "server.com[test]", true, "invalid characters"},
+		{"command_injection_braces", "server.com{test}", true, "invalid characters"},
+		{"command_injection_redirect", "server.com>file", true, "invalid characters"},
+		{"command_injection_quotes", "server.com\"test\"", true, "invalid characters"},
+		{"command_injection_single_quote", "server.com'test'", true, "invalid characters"},
+		{"command_injection_exclamation", "server.com!test", true, "invalid characters"},
+		{"command_injection_asterisk", "server.com*", true, "invalid characters"},
+		{"command_injection_question", "server.com?", true, "invalid characters"},
 
 		// Invalid hostnames - format violations
 		{"empty_hostname", "", true, "cannot be empty"},
@@ -90,11 +90,11 @@ func TestValidateFilePath(t *testing.T) {
 		{"path_traversal_simple", "../../../etc/passwd", true, "path traversal"},
 		{"path_traversal_absolute", "/home/user/../../../etc/passwd", true, "path traversal"},
 		{"path_traversal_mixed", "/home/user/./../../etc/passwd", true, "path traversal"},
-		{"command_injection_semicolon", "/home/user;rm -rf /", true, "dangerous character"},
-		{"command_injection_ampersand", "/home/user && rm -rf /", true, "dangerous character"},
-		{"command_injection_pipe", "/home/user | cat", true, "dangerous character"},
-		{"command_injection_backtick", "/home/user`whoami`", true, "dangerous character"},
-		{"command_injection_dollar", "/home/user$(whoami)", true, "dangerous character"},
+		{"command_injection_semicolon", "/home/user;rm -rf /", true, "invalid characters"},
+		{"command_injection_ampersand", "/home/user && rm -rf /", true, "invalid characters"},
+		{"command_injection_pipe", "/home/user | cat", true, "invalid characters"},
+		{"command_injection_backtick", "/home/user`whoami`", true, "invalid characters"},
+		{"command_injection_dollar", "/home/user$(whoami)", true, "invalid characters"},
 		{"null_byte_injection", "/home/user\x00/etc/passwd", true, "null byte"},
 		{"control_char_injection", "/home/user\x01test", true, "control character"},
 
@@ -275,14 +275,14 @@ func TestSanitizeShellArg(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"simple_arg", "test", "'test'"},
-		{"arg_with_space", "hello world", "'hello world'"},
-		{"arg_with_single_quote", "don't", "'don'\"'\"'t'"},
-		{"arg_with_multiple_quotes", "can't won't", "'can'\"'\"'t won'\"'\"'t'"},
-		{"empty_arg", "", "''"},
-		{"arg_with_special_chars", "test;rm -rf /", "'test;rm -rf /'"},
-		{"arg_with_backticks", "test`whoami`", "'test`whoami`'"},
-		{"arg_with_dollar", "test$USER", "'test$USER'"},
+		{"simple_arg", "test", `"test"`},
+		{"arg_with_space", "hello world", `"hello world"`},
+		{"arg_with_single_quote", "don't", `"don't"`},
+		{"arg_with_double_quote", `say "hello"`, `"say \"hello\""`},
+		{"empty_arg", "", `""`},
+		{"arg_with_special_chars", "test;rm -rf /", `"test;rm -rf /"`},
+		{"arg_with_backticks", "test`whoami`", `"test` + "`" + `whoami` + "`" + `"`},
+		{"arg_with_dollar", "test$USER", `"test$USER"`},
 	}
 
 	for _, tt := range tests {
@@ -378,7 +378,7 @@ func TestConvenienceFunctions(t *testing.T) {
 
 	// Test SanitizeShellArg convenience function
 	result := SanitizeShellArg("test arg")
-	expected := "'test arg'"
+	expected := `"test arg"`
 	if result != expected {
 		t.Errorf("SanitizeShellArg convenience function failed: got %s, expected %s", result, expected)
 	}
