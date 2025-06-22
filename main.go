@@ -43,7 +43,7 @@ func parseScpRemoteArg(remoteArg string, defaultSshUser string) (host, path, use
 
 	parts := strings.SplitN(remoteArg, ":", 2)
 	if len(parts) != 2 || parts[1] == "" { // Ensure path part exists
-		return "", "", "", fmt.Errorf(T("invalid_scp_remote"), remoteArg)
+		return "", "", "", fmt.Errorf("%s", T("invalid_scp_remote"))
 	}
 	path = parts[1]
 	hostPart := parts[0]
@@ -51,7 +51,7 @@ func parseScpRemoteArg(remoteArg string, defaultSshUser string) (host, path, use
 	if strings.Contains(hostPart, "@") {
 		userHostParts := strings.SplitN(hostPart, "@", 2)
 		if len(userHostParts) != 2 || userHostParts[0] == "" || userHostParts[1] == "" {
-			return "", "", "", fmt.Errorf(T("invalid_user_host"), hostPart)
+			return "", "", "", fmt.Errorf("%s", T("invalid_user_host"))
 		}
 		user = userHostParts[0]
 		host = userHostParts[1]
@@ -60,7 +60,7 @@ func parseScpRemoteArg(remoteArg string, defaultSshUser string) (host, path, use
 	}
 
 	if host == "" {
-		return "", "", "", fmt.Errorf(T("empty_host_scp"), remoteArg)
+		return "", "", "", fmt.Errorf("%s", T("empty_host_scp"))
 	}
 	return host, path, user, nil
 }
@@ -128,9 +128,10 @@ func main() {
 	if err == nil {
 		defaultUser = currentUser.Username
 	}
+	// Use modern SSH key discovery that prioritizes Ed25519 over RSA
 	defaultKeyPath := ""
 	if currentUser != nil {
-		defaultKeyPath = filepath.Join(currentUser.HomeDir, ".ssh", "id_rsa")
+		defaultKeyPath = getDefaultSSHKeyPath(currentUser, nil) // nil logger for now since it's not initialized yet
 	}
 	defaultTsnetDir := ""
 	if currentUser != nil {
@@ -178,30 +179,30 @@ func main() {
 			initI18n(tempLang)
 		}
 		
-		fmt.Fprintf(os.Stderr, T("usage_header", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("usage_list", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("usage_multi", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("usage_exec", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("usage_copy", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("usage_pick", os.Args[0])+"\n\n")
-		fmt.Fprintf(os.Stderr, T("usage_description")+"\n")
+		fmt.Fprint(os.Stderr, T("usage_header", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("usage_list", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("usage_multi", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("usage_exec", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("usage_copy", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("usage_pick", os.Args[0])+"\n\n")
+		fmt.Fprint(os.Stderr, T("usage_description")+"\n")
 		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, T("examples_header")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_basic_ssh")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_interactive", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_remote_cmd", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_host_discovery")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_list_hosts", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_pick_host", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_multi_host")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_tmux", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_exec_multi", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_parallel", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_file_transfer")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_scp_single", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_scp_multi", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_proxy")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_proxy_cmd", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_header")+"\n")
+		fmt.Fprint(os.Stderr, T("examples_basic_ssh")+"\n")
+		fmt.Fprint(os.Stderr, T("examples_interactive", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_remote_cmd", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_host_discovery")+"\n")
+		fmt.Fprint(os.Stderr, T("examples_list_hosts", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_pick_host", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_multi_host")+"\n")
+		fmt.Fprint(os.Stderr, T("examples_tmux", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_exec_multi", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_parallel", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_file_transfer")+"\n")
+		fmt.Fprint(os.Stderr, T("examples_scp_single", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_scp_multi", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_proxy")+"\n")
+		fmt.Fprint(os.Stderr, T("examples_proxy_cmd", os.Args[0])+"\n")
 	}
 	flag.Parse()
 
@@ -230,7 +231,7 @@ func main() {
 	if listHosts || pickHost || multiHosts != "" || execCmd != "" || copyFiles != "" {
 		srv, ctx, status, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, T("error_init_tailscale")+"\n", err)
+			fmt.Fprint(os.Stderr, T("error_init_tailscale")+"\n")
 			os.Exit(1)
 		}
 		defer srv.Close()
@@ -311,7 +312,7 @@ func main() {
 		}
 		srv, ctx, _, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, T("error_init_tailscale")+"\n", err)
+			fmt.Fprint(os.Stderr, T("error_init_tailscale")+"\n")
 			os.Exit(1)
 		}
 		defer srv.Close()
@@ -321,7 +322,7 @@ func main() {
 			detectedScpArgs.isUpload, verbose)
 
 		if err != nil {
-			fmt.Fprintf(os.Stderr, T("error_scp_failed")+"\n", err)
+			fmt.Fprint(os.Stderr, T("error_scp_failed")+"\n")
 			os.Exit(1)
 		}
 		fmt.Fprintln(os.Stderr, T("scp_success"))
@@ -341,7 +342,7 @@ func main() {
 
 	targetHost, targetPort, err := parseTarget(target, DefaultSshPort)
 	if err != nil {
-		logger.Fatalf(T("error_parsing_target"), err)
+		logger.Fatalf("%s: %v", T("error_parsing_target"), err)
 	}
 	
 	sshSpecificUser := sshUser 
@@ -364,7 +365,7 @@ func main() {
 
 	srv, ctx, _, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, T("error_init_ssh")+"\n", err)
+		fmt.Fprint(os.Stderr, T("error_init_ssh")+"\n")
 		os.Exit(1)
 	}
 	defer srv.Close()
@@ -494,7 +495,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to start remote shell: %v", err)
 	}
-	fmt.Fprintf(os.Stderr, T("escape_sequence")+"\n")
+	fmt.Fprint(os.Stderr, T("escape_sequence")+"\n")
 	go func() {
 		reader := bufio.NewReader(os.Stdin)
 		atLineStart := true
