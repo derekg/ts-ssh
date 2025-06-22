@@ -17,6 +17,7 @@ import (
 
 	"github.com/derekg/ts-ssh/internal/client/scp"
 	sshclient "github.com/derekg/ts-ssh/internal/client/ssh"
+	"github.com/derekg/ts-ssh/internal/security"
 )
 
 // AppConfig holds all the configuration for the application
@@ -250,6 +251,7 @@ func handleSSHOperation(config *AppConfig) error {
 	}
 
 	config.Target = flag.Args()[0]
+	
 	targetHost, targetPort, err := parseTarget(config.Target, DefaultSshPort)
 	if err != nil {
 		return fmt.Errorf("%s", T("error_parsing_target"))
@@ -261,6 +263,22 @@ func handleSSHOperation(config *AppConfig) error {
 		parts := strings.SplitN(targetHost, "@", 2)
 		sshSpecificUser = parts[0]
 		targetHost = parts[1]
+		
+		// SECURITY: Validate extracted SSH user and hostname
+		if err := security.ValidateSSHUser(sshSpecificUser); err != nil {
+			return fmt.Errorf("SSH user validation failed: %w", err)
+		}
+		if err := security.ValidateHostname(targetHost); err != nil {
+			return fmt.Errorf("extracted hostname validation failed: %w", err)
+		}
+	}
+	
+	// SECURITY: Validate all components
+	if err := security.ValidateSSHUser(sshSpecificUser); err != nil {
+		return fmt.Errorf("SSH user validation failed: %w", err)
+	}
+	if err := security.ValidatePort(targetPort); err != nil {
+		return fmt.Errorf("port validation failed: %w", err)
 	}
 
 	// Initialize tsnet

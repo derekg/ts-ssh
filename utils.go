@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/derekg/ts-ssh/internal/security"
@@ -51,9 +50,27 @@ func parseTarget(target string, defaultPort string) (host, port string, err erro
 		port = defaultPort
 	}
 	
-	// Validate that port is numeric
-	if _, err := strconv.Atoi(port); err != nil {
-		return "", "", fmt.Errorf(T("invalid_port_number"), port, err)
+	// SECURITY: Validate extracted components
+	// Handle case where host might contain user@hostname format
+	actualHost := host
+	if strings.Contains(host, "@") {
+		// Extract just the hostname part for validation
+		parts := strings.SplitN(host, "@", 2)
+		if len(parts) == 2 {
+			// Validate the user part
+			if err := security.ValidateSSHUser(parts[0]); err != nil {
+				return "", "", fmt.Errorf("SSH user validation failed: %w", err)
+			}
+			actualHost = parts[1]
+		}
+	}
+	
+	if err := security.ValidateHostname(actualHost); err != nil {
+		return "", "", fmt.Errorf("hostname validation failed: %w", err)
+	}
+	
+	if err := security.ValidatePort(port); err != nil {
+		return "", "", fmt.Errorf("port validation failed: %w", err)
 	}
 	
 	return host, port, nil

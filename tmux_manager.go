@@ -160,6 +160,11 @@ func (tm *TmuxManager) sendKeysToWindow(windowName, command string) error {
 // buildSecureSSHCommand constructs a secure SSH command using temporary config files
 // to avoid exposing credentials in process lists
 func (tm *TmuxManager) buildSecureSSHCommand(host string) (string, string, error) {
+	// SECURITY: Validate hostname to prevent command injection
+	if err := security.ValidateHostname(host); err != nil {
+		return "", "", fmt.Errorf("hostname validation failed: %w", err)
+	}
+	
 	// Create temporary SSH config file to avoid credential exposure
 	tempConfigFile, err := tm.createTemporarySSHConfig(host)
 	if err != nil {
@@ -169,15 +174,26 @@ func (tm *TmuxManager) buildSecureSSHCommand(host string) (string, string, error
 	// Build command using config file instead of command line args
 	cmdParts := []string{os.Args[0]} // Our binary path
 	cmdParts = append(cmdParts, "-F", tempConfigFile) // Use SSH config file
-	cmdParts = append(cmdParts, host) // Just the hostname, config has the rest
+	
+	// SECURITY: Sanitize hostname for shell execution
+	sanitizedHost := security.SanitizeShellArg(host)
+	cmdParts = append(cmdParts, sanitizedHost) // Safely escaped hostname
 	
 	return strings.Join(cmdParts, " "), tempConfigFile, nil
 }
 
 // createTemporarySSHConfig creates a temporary SSH config file with secure permissions
 func (tm *TmuxManager) createTemporarySSHConfig(host string) (string, error) {
-	// Generate unique filename for temporary config
-	tempFileName := fmt.Sprintf("/tmp/ts-ssh-config-%s-%s.conf", host, security.GenerateRandomSuffix())
+	// SECURITY: Validate hostname again for config file creation
+	if err := security.ValidateHostname(host); err != nil {
+		return "", fmt.Errorf("hostname validation failed: %w", err)
+	}
+	
+	// Generate unique filename for temporary config using secure random suffix
+	// Use a sanitized version of hostname for the filename
+	safeHostname := strings.ReplaceAll(host, ":", "_")
+	safeHostname = strings.ReplaceAll(safeHostname, "/", "_")
+	tempFileName := fmt.Sprintf("/tmp/ts-ssh-config-%s-%s.conf", safeHostname, security.GenerateRandomSuffix())
 	
 	// Create temporary file with secure permissions atomically
 	tempFile, err := security.CreateSecureFile(tempFileName, 0600)
