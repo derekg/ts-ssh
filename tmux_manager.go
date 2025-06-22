@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -149,10 +150,20 @@ func (tm *TmuxManager) addWindow(windowName, host string) error {
 
 // sendKeysToWindow sends a command to a specific tmux window
 func (tm *TmuxManager) sendKeysToWindow(windowName, command string) error {
+	// SECURITY: Validate window name to prevent injection
+	if err := security.ValidateWindowName(windowName); err != nil {
+		return fmt.Errorf("window name validation failed: %w", err)
+	}
+	
+	// SECURITY: Validate command to prevent injection
+	if err := security.ValidateCommand(command); err != nil {
+		return fmt.Errorf("command validation failed: %w", err)
+	}
+	
 	target := fmt.Sprintf("%s:%s", tm.sessionName, windowName)
 	cmd := exec.Command("tmux", "send-keys", "-t", target, command, "Enter")
 	
-	tm.logger.Printf("Sending to window %s: %s", windowName, command)
+	tm.logger.Printf("Sending to window %s: [command validated]", windowName)
 	
 	return cmd.Run()
 }
@@ -160,6 +171,11 @@ func (tm *TmuxManager) sendKeysToWindow(windowName, command string) error {
 // buildSecureSSHCommand constructs a secure SSH command using temporary config files
 // to avoid exposing credentials in process lists
 func (tm *TmuxManager) buildSecureSSHCommand(host string) (string, string, error) {
+	// SECURITY: Validate hostname to prevent command injection
+	if err := security.ValidateHostname(host); err != nil {
+		return "", "", fmt.Errorf("hostname validation failed: %w", err)
+	}
+	
 	// Create temporary SSH config file to avoid credential exposure
 	tempConfigFile, err := tm.createTemporarySSHConfig(host)
 	if err != nil {
@@ -169,15 +185,54 @@ func (tm *TmuxManager) buildSecureSSHCommand(host string) (string, string, error
 	// Build command using config file instead of command line args
 	cmdParts := []string{os.Args[0]} // Our binary path
 	cmdParts = append(cmdParts, "-F", tempConfigFile) // Use SSH config file
-	cmdParts = append(cmdParts, host) // Just the hostname, config has the rest
+	
+	// SECURITY: Sanitize hostname for shell execution
+	sanitizedHost := security.SanitizeShellArg(host)
+	cmdParts = append(cmdParts, sanitizedHost) // Safely escaped hostname
 	
 	return strings.Join(cmdParts, " "), tempConfigFile, nil
 }
 
 // createTemporarySSHConfig creates a temporary SSH config file with secure permissions
 func (tm *TmuxManager) createTemporarySSHConfig(host string) (string, error) {
-	// Generate unique filename for temporary config
-	tempFileName := fmt.Sprintf("/tmp/ts-ssh-config-%s-%s.conf", host, security.GenerateRandomSuffix())
+	// SECURITY: Validate hostname again for config file creation
+	if err := security.ValidateHostname(host); err != nil {
+		return "", fmt.Errorf("hostname validation failed: %w", err)
+	}
+	
+	// Generate secure filename for temporary config using multiple sanitization layers
+	// First, use filepath.Base to strip any path components (prevent directory traversal)
+	safeHostname := filepath.Base(host)
+	
+	// Remove or replace ALL potentially dangerous characters for filesystem safety
+	// This is more comprehensive than just : and @
+	dangerousChars := ":@/\\<>|*?\"'"
+	for _, char := range dangerousChars {
+		safeHostname = strings.ReplaceAll(safeHostname, string(char), "_")
+	}
+	
+	// Remove any control characters or non-printable characters
+	var cleanHostname strings.Builder
+	for _, r := range safeHostname {
+		if r >= 32 && r <= 126 { // Only allow printable ASCII
+			cleanHostname.WriteRune(r)
+		} else {
+			cleanHostname.WriteRune('_')
+		}
+	}
+	safeHostname = cleanHostname.String()
+	
+	// Ensure we don't start with dangerous characters like dots or hyphens
+	safeHostname = strings.TrimLeft(safeHostname, ".-_")
+	if safeHostname == "" {
+		safeHostname = "host" // Fallback if hostname becomes empty after sanitization
+	}
+	
+	// Limit length to prevent filesystem issues (50 chars is reasonable for temp files)
+	if len(safeHostname) > 50 {
+		safeHostname = safeHostname[:50]
+	}
+	tempFileName := fmt.Sprintf("/tmp/ts-ssh-config-%s-%s.conf", safeHostname, security.GenerateRandomSuffix())
 	
 	// Create temporary file with secure permissions atomically
 	tempFile, err := security.CreateSecureFile(tempFileName, 0600)

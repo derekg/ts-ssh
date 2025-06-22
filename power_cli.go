@@ -295,6 +295,15 @@ func executeSequential(srv *tsnet.Server, ctx context.Context, execCmd string, h
 func executeCommandOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host string,
 	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, authMutex *sync.Mutex) (string, error) {
 	
+	// SECURITY: Validate command and hostname to prevent injection attacks
+	if err := security.ValidateCommand(execCmd); err != nil {
+		return "", fmt.Errorf("command validation failed: %w", err)
+	}
+	
+	if err := security.ValidateHostname(host); err != nil {
+		return "", fmt.Errorf("hostname validation failed: %w", err)
+	}
+	
 	// Parse target and user
 	targetHost, targetPort, err := parseTarget(host, DefaultSshPort)
 	if err != nil {
@@ -306,6 +315,26 @@ func executeCommandOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host 
 		parts := strings.SplitN(targetHost, "@", 2)
 		effectiveUser = parts[0]
 		targetHost = parts[1]
+		
+		// SECURITY: Validate extracted SSH user
+		if err := security.ValidateSSHUser(effectiveUser); err != nil {
+			return "", fmt.Errorf("SSH user validation failed: %w", err)
+		}
+		
+		// SECURITY: Re-validate hostname after extraction
+		if err := security.ValidateHostname(targetHost); err != nil {
+			return "", fmt.Errorf("extracted hostname validation failed: %w", err)
+		}
+	}
+	
+	// SECURITY: Validate SSH user in all cases
+	if err := security.ValidateSSHUser(effectiveUser); err != nil {
+		return "", fmt.Errorf("SSH user validation failed: %w", err)
+	}
+	
+	// SECURITY: Validate port
+	if err := security.ValidatePort(targetPort); err != nil {
+		return "", fmt.Errorf("port validation failed: %w", err)
 	}
 
 	// Create SSH config using standard helpers
