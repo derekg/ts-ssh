@@ -46,8 +46,13 @@ func discoverSSHKey(homeDir string, logger *log.Logger) string {
 		
 		// Check if the private key file exists and is readable
 		if info, err := os.Stat(keyPath); err == nil && !info.IsDir() {
-			// Verify file has reasonable permissions (not world-readable)
-			if info.Mode().Perm() & 0044 == 0 { // Check that group and others don't have read permission
+			// Verify file has secure permissions (not readable by group or others)
+			// SSH private keys should be readable only by owner (mode 0600 or stricter)
+			const groupReadPerm = os.FileMode(0040)  // Group read permission
+			const otherReadPerm = os.FileMode(0004)  // Other (world) read permission
+			const insecurePerms = groupReadPerm | otherReadPerm
+			
+			if info.Mode().Perm() & insecurePerms == 0 { // Ensure neither group nor others can read
 				if logger != nil {
 					logger.Printf("Found SSH key: %s (type: %s)", keyPath, keyType)
 				}
