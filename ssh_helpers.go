@@ -6,10 +6,8 @@ import (
 	"log"
 	"net"
 	"os/user"
-	"syscall"
 
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/term"
 	"tailscale.com/tsnet"
 )
 
@@ -26,47 +24,25 @@ type SSHConnectionConfig struct {
 }
 
 // createSSHAuthMethods creates authentication methods for SSH connection.
-// It attempts to load an SSH private key from keyPath if provided, and always
-// includes password authentication as a fallback. This function eliminates
-// duplication of auth setup across multiple files.
+// It uses modern key discovery to automatically find the best available SSH key,
+// prioritizing Ed25519 over legacy RSA keys. Always includes password auth as fallback.
 //
 // Parameters:
-//   - keyPath: path to SSH private key file (optional)
+//   - keyPath: path to SSH private key file (optional, if empty uses auto-discovery)
 //   - sshUser: username for SSH connection
 //   - targetHost: hostname for password prompts
 //   - logger: logger instance for debug output
 //
 // Returns a slice of ssh.AuthMethod and any error that occurred.
 func createSSHAuthMethods(keyPath, sshUser, targetHost string, logger *log.Logger) ([]ssh.AuthMethod, error) {
-	var authMethods []ssh.AuthMethod
-
-	// Try to load SSH key if provided
-	if keyPath != "" {
-		keyAuth, err := LoadPrivateKey(keyPath, logger)
-		if err == nil {
-			authMethods = append(authMethods, keyAuth)
-			if logger != nil {
-				logger.Printf(T("using_key_auth"), keyPath)
-			}
-		} else {
-			if logger != nil {
-				logger.Printf(T("key_auth_failed"), err)
-			}
-		}
+	// Get current user for key discovery
+	currentUser, err := user.Current()
+	if err != nil && logger != nil {
+		logger.Printf("Warning: Could not get current user for SSH key discovery: %v", err)
 	}
 
-	// Add password authentication as fallback
-	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		fmt.Print(T("enter_password", sshUser, targetHost))
-		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
-		fmt.Println()
-		if err != nil {
-			return "", fmt.Errorf("failed to read password: %w", err)
-		}
-		return string(bytePassword), nil
-	}))
-
-	return authMethods, nil
+	// Use the modern key discovery system
+	return createModernSSHAuthMethods(keyPath, sshUser, targetHost, currentUser, logger)
 }
 
 // createSSHConfig creates an SSH client configuration from the provided parameters.
@@ -90,7 +66,7 @@ func createSSHConfig(config SSHConnectionConfig) (*ssh.ClientConfig, error) {
 	var hostKeyCallback ssh.HostKeyCallback
 	if config.InsecureHostKey {
 		if config.Logger != nil {
-			config.Logger.Printf(T("host_key_warning"))
+			config.Logger.Printf("%s", T("host_key_warning"))
 		}
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	} else {
@@ -131,26 +107,26 @@ func establishSSHConnection(srv *tsnet.Server, ctx context.Context, config SSHCo
 	sshTargetAddr := net.JoinHostPort(config.TargetHost, config.TargetPort)
 	
 	if config.Logger != nil {
-		config.Logger.Printf(T("dial_via_tsnet"), sshTargetAddr)
+		config.Logger.Printf("%s", T("dial_via_tsnet"))
 	}
 
 	// Dial via tsnet
 	conn, err := srv.Dial(ctx, "tcp", sshTargetAddr)
 	if err != nil {
-		return nil, fmt.Errorf(T("dial_failed", sshTargetAddr, err))
+		return nil, fmt.Errorf("%s", T("dial_failed"))
 	}
 
 	// Establish SSH connection
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, sshTargetAddr, sshConfig)
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf(T("ssh_connection_failed", sshTargetAddr, err))
+		return nil, fmt.Errorf("%s", T("ssh_connection_failed"))
 	}
 
 	client := ssh.NewClient(sshConn, chans, reqs)
 	
 	if config.Logger != nil {
-		config.Logger.Printf(T("ssh_connection_established"))
+		config.Logger.Printf("%s", T("ssh_connection_established"))
 	}
 
 	return client, nil
@@ -159,6 +135,9 @@ func establishSSHConnection(srv *tsnet.Server, ctx context.Context, config SSHCo
 // createSSHSession creates an SSH session with standard configuration
 // This standardizes session creation across different use cases
 func createSSHSession(client *ssh.Client) (*ssh.Session, error) {
+	if client == nil {
+		return nil, fmt.Errorf("SSH client cannot be nil")
+	}
 	session, err := client.NewSession()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SSH session: %w", err)
