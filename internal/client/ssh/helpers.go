@@ -12,6 +12,7 @@ import (
 	"tailscale.com/tsnet"
 	
 	"github.com/derekg/ts-ssh/internal/config"
+	"github.com/derekg/ts-ssh/internal/crypto/pqc"
 )
 
 // Constants needed by SSH package
@@ -58,6 +59,7 @@ type SSHConnectionConfig struct {
 	Verbose         bool
 	CurrentUser     *user.User
 	Logger          *log.Logger
+	PQCConfig       *pqc.Config // Post-quantum cryptography configuration
 }
 
 // createSSHAuthMethods creates authentication methods for SSH connection.
@@ -114,12 +116,22 @@ func createSSHConfig(config SSHConnectionConfig) (*ssh.ClientConfig, error) {
 		}
 	}
 
-	return &ssh.ClientConfig{
+	sshConfig := &ssh.ClientConfig{
 		User:            config.User,
 		Auth:            authMethods,
 		HostKeyCallback: hostKeyCallback,
 		Timeout:         DefaultSSHTimeout,
-	}, nil
+	}
+	
+	// Apply PQC configuration if provided
+	if config.PQCConfig != nil {
+		pqc.ConfigureSSHConfig(sshConfig, config.PQCConfig)
+		if config.Logger != nil && config.PQCConfig.EnablePQC {
+			config.Logger.Printf("PQC: Post-quantum cryptography enabled (level: %d)", config.PQCConfig.QuantumResistance)
+		}
+	}
+	
+	return sshConfig, nil
 }
 
 // establishSSHConnection creates a complete SSH connection using tsnet.

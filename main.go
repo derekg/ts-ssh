@@ -21,6 +21,7 @@ import (
 
 	"github.com/derekg/ts-ssh/internal/client/scp"
 	sshclient "github.com/derekg/ts-ssh/internal/client/ssh"
+	"github.com/derekg/ts-ssh/internal/crypto/pqc"
 	"github.com/derekg/ts-ssh/internal/platform"
 	"github.com/derekg/ts-ssh/internal/security"
 )
@@ -134,6 +135,11 @@ func main() {
 		copyFiles       string
 		pickHost        bool
 		parallel        bool
+		
+		// Post-quantum cryptography options
+		enablePQC       bool
+		pqcLevel        int
+		pqcReport       bool
 	)
 
 	currentUser, err := user.Current()
@@ -174,6 +180,12 @@ func main() {
 	flag.StringVar(&copyFiles, "copy", "", T("flag_copy_desc"))
 	flag.BoolVar(&pickHost, "pick", false, T("flag_pick_desc"))
 	flag.BoolVar(&parallel, "parallel", false, T("flag_parallel_desc"))
+	
+	// Post-quantum cryptography flags
+	flag.BoolVar(&enablePQC, "pqc", true, "Enable post-quantum cryptography (default: true)")
+	flag.IntVar(&pqcLevel, "pqc-level", 1, "PQC level: 0=none, 1=hybrid, 2=strict (default: 1)")
+	flag.BoolVar(&pqcReport, "pqc-report", false, "Generate PQC usage report")
+	
 	flag.Usage = func() {
 		// Parse args to get language flag before displaying help
 		// This is a bit hacky but necessary for dynamic language in help
@@ -239,6 +251,22 @@ func main() {
 
 	if showVersion {
 		fmt.Fprintf(os.Stdout, "%s\n", version)
+		os.Exit(0)
+	}
+	
+	// Handle PQC report generation
+	if pqcReport {
+		report := pqc.GenerateGlobalReport(logger)
+		fmt.Println(report)
+		ready, assessment := pqc.CheckGlobalQuantumReadiness(logger)
+		fmt.Printf("\nQuantum Readiness: %v - %s\n", ready, assessment)
+		recommendations := pqc.GetGlobalRecommendations(logger)
+		if len(recommendations) > 0 {
+			fmt.Println("\nRecommendations:")
+			for _, rec := range recommendations {
+				fmt.Printf("  - %s\n", rec)
+			}
+		}
 		os.Exit(0)
 	}
 
@@ -439,6 +467,18 @@ func main() {
 	}
 	logger.Printf("tsnet potentially initialized. Attempting SSH connection to %s@%s:%s", sshSpecificUser, targetHost, targetPort)
 
+	// Configure PQC settings
+	var pqcConfig *pqc.Config
+	if enablePQC {
+		pqcConfig = pqc.DefaultConfig()
+		pqcConfig.QuantumResistance = pqc.QuantumResistanceLevel(pqcLevel)
+		pqcConfig.EnablePQC = true
+		pqcConfig.LogPQCUsage = verbose
+		if verbose {
+			logger.Printf("PQC: Enabled with resistance level %d", pqcLevel)
+		}
+	}
+	
 	// Use the new helper function for SSH connection setup
 	sshConfig := sshclient.SSHConnectionConfig{
 		User:            sshSpecificUser,
@@ -449,6 +489,7 @@ func main() {
 		Verbose:         verbose,
 		CurrentUser:     currentUser,
 		Logger:          logger,
+		PQCConfig:       pqcConfig,
 	}
 
 	client, err := sshclient.EstablishSSHConnection(srv, nonTuiCtx, sshConfig)

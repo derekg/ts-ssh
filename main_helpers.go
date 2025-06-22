@@ -17,6 +17,7 @@ import (
 
 	"github.com/derekg/ts-ssh/internal/client/scp"
 	sshclient "github.com/derekg/ts-ssh/internal/client/ssh"
+	"github.com/derekg/ts-ssh/internal/crypto/pqc"
 	"github.com/derekg/ts-ssh/internal/security"
 )
 
@@ -39,6 +40,10 @@ type AppConfig struct {
 	CopyFiles  string
 	PickHost   bool
 	Parallel   bool
+	// Post-quantum cryptography
+	EnablePQC bool
+	PQCLevel  int
+	PQCReport bool
 	// Derived values
 	RemoteCmd []string
 	Logger    *log.Logger
@@ -299,6 +304,18 @@ func handleSSHOperation(config *AppConfig) error {
 		currentUser = &user.User{Username: sshSpecificUser}
 	}
 
+	// Configure PQC settings
+	var pqcConfig *pqc.Config
+	if config.EnablePQC {
+		pqcConfig = pqc.DefaultConfig()
+		pqcConfig.QuantumResistance = pqc.QuantumResistanceLevel(config.PQCLevel)
+		pqcConfig.EnablePQC = true
+		pqcConfig.LogPQCUsage = config.Verbose
+		if config.Verbose {
+			config.Logger.Printf("PQC: Enabled with resistance level %d", config.PQCLevel)
+		}
+	}
+	
 	// Establish SSH connection
 	sshConfig := sshclient.SSHConnectionConfig{
 		User:            sshSpecificUser,
@@ -309,6 +326,7 @@ func handleSSHOperation(config *AppConfig) error {
 		Verbose:         config.Verbose,
 		CurrentUser:     currentUser,
 		Logger:          config.Logger,
+		PQCConfig:       pqcConfig,
 	}
 
 	client, err := sshclient.EstablishSSHConnection(srv, nonTuiCtx, sshConfig)

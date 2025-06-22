@@ -292,7 +292,7 @@ Once authorized, `ts-ssh` stores authentication keys in the state directory (`~/
 
 ## Security & Enterprise Features
 
-### 🔒 Enterprise-Grade Security (Score: 8.5/10)
+### 🔒 Enterprise-Grade Security
 *   **Modern SSH Key Support**: Ed25519 prioritized over legacy RSA keys
 *   **Host Key Verification**: Comprehensive verification against `~/.ssh/known_hosts`
 *   **TTY Security**: Multi-layer validation preventing hijacking attacks
@@ -300,10 +300,10 @@ Once authorized, `ts-ssh` stores authentication keys in the state directory (`~/
 *   **Atomic File Operations**: Race condition prevention in file handling
 *   **Cross-Platform Security**: Platform-specific implementations for Windows/macOS/Linux
 
-### 🛡️ Security Compliance
-*   **SOC 2 Ready**: Comprehensive audit logging and access controls
-*   **PCI DSS Compatible**: Secure credential and file permission management
-*   **GDPR Compliant**: No information disclosure vulnerabilities
+### 🛡️ Security Implementation
+*   **Comprehensive Audit Logging**: Security events and insecure mode usage tracking
+*   **Secure Credential Management**: Process title masking and environment sanitization
+*   **Information Security**: No credential exposure in logs or process lists
 
 ### ⚠️ Security Flags
 *   **`-insecure` Flag**: Disables host key checking - **USE WITH CAUTION**
