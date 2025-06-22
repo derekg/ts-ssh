@@ -119,30 +119,30 @@ func createUsageFunction() func() {
 			initI18n(tempLang)
 		}
 
-		fmt.Fprintf(os.Stderr, T("usage_header", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("usage_list", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("usage_multi", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("usage_exec", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("usage_copy", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("usage_pick", os.Args[0])+"\n\n")
-		fmt.Fprintf(os.Stderr, T("usage_description")+"\n")
+		fmt.Fprint(os.Stderr, T("usage_header", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("usage_list", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("usage_multi", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("usage_exec", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("usage_copy", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("usage_pick", os.Args[0])+"\n\n")
+		fmt.Fprint(os.Stderr, T("usage_description")+"\n")
 		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, T("examples_header")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_basic_ssh")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_interactive", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_remote_cmd", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_host_discovery")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_list_hosts", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_pick_host", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_multi_host")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_tmux", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_exec_multi", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_parallel", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_file_transfer")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_scp_single", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_scp_multi", os.Args[0])+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_proxy")+"\n")
-		fmt.Fprintf(os.Stderr, T("examples_proxy_cmd", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_header")+"\n")
+		fmt.Fprint(os.Stderr, T("examples_basic_ssh")+"\n")
+		fmt.Fprint(os.Stderr, T("examples_interactive", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_remote_cmd", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_host_discovery")+"\n")
+		fmt.Fprint(os.Stderr, T("examples_list_hosts", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_pick_host", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_multi_host")+"\n")
+		fmt.Fprint(os.Stderr, T("examples_tmux", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_exec_multi", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_parallel", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_file_transfer")+"\n")
+		fmt.Fprint(os.Stderr, T("examples_scp_single", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_scp_multi", os.Args[0])+"\n")
+		fmt.Fprint(os.Stderr, T("examples_proxy")+"\n")
+		fmt.Fprint(os.Stderr, T("examples_proxy_cmd", os.Args[0])+"\n")
 	}
 }
 
@@ -164,7 +164,7 @@ func isPowerCLIMode(config *AppConfig) bool {
 func handlePowerCLI(config *AppConfig) error {
 	srv, ctx, status, err := initTsNet(config.TsnetDir, ClientName, config.Logger, config.TsControlURL, config.Verbose)
 	if err != nil {
-		return fmt.Errorf(T("error_init_tailscale", err))
+		return fmt.Errorf("%s", T("error_init_tailscale"))
 	}
 
 	// Get current user
@@ -216,7 +216,7 @@ func detectSCPOperation(config *AppConfig) *scpArgs {
 func handleSCPOperation(scpArgs *scpArgs, config *AppConfig) error {
 	srv, ctx, _, err := initTsNet(config.TsnetDir, ClientName, config.Logger, config.TsControlURL, config.Verbose)
 	if err != nil {
-		return fmt.Errorf(T("error_init_tailscale", err))
+		return fmt.Errorf("%s", T("error_init_tailscale"))
 	}
 
 	// Get current user
@@ -231,7 +231,7 @@ func handleSCPOperation(scpArgs *scpArgs, config *AppConfig) error {
 					  scpArgs.remotePath, scpArgs.targetHost, true, config.Verbose)
 
 	if err != nil {
-		return fmt.Errorf(T("error_scp_failed", err))
+		return fmt.Errorf("%s", T("error_scp_failed"))
 	}
 
 	fmt.Println(T("scp_success"))
@@ -249,7 +249,7 @@ func handleSSHOperation(config *AppConfig) error {
 	config.Target = flag.Args()[0]
 	targetHost, targetPort, err := parseTarget(config.Target, DefaultSshPort)
 	if err != nil {
-		return fmt.Errorf(T("error_parsing_target", err))
+		return fmt.Errorf("%s", T("error_parsing_target"))
 	}
 
 	// Determine SSH user
@@ -263,7 +263,7 @@ func handleSSHOperation(config *AppConfig) error {
 	// Initialize tsnet
 	srv, nonTuiCtx, _, err := initTsNet(config.TsnetDir, ClientName, config.Logger, config.TsControlURL, config.Verbose)
 	if err != nil {
-		return fmt.Errorf(T("error_init_ssh", err))
+		return fmt.Errorf("%s", T("error_init_ssh"))
 	}
 
 	// Handle ProxyCommand mode
@@ -422,7 +422,7 @@ func handleInteractiveSession(session *ssh.Session, stdinPipe io.WriteCloser, fd
 			}()
 		}
 		
-		fmt.Fprintf(os.Stderr, T("escape_sequence")+"\n")
+		fmt.Fprint(os.Stderr, T("escape_sequence")+"\n")
 	}
 	
 	// Set up signal handling for graceful shutdown

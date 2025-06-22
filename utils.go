@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	// "golang.org/x/term" // Not used in this file
@@ -49,6 +50,12 @@ func parseTarget(target string, defaultPort string) (host, port string, err erro
 	if port == "" { 
 		port = defaultPort
 	}
+	
+	// Validate that port is numeric
+	if _, err := strconv.Atoi(port); err != nil {
+		return "", "", fmt.Errorf("invalid port number '%s': %w", port, err)
+	}
+	
 	return host, port, nil
 }
 
