@@ -15,12 +15,13 @@ import (
 	"tailscale.com/tsnet"
 
 	sshclient "github.com/derekg/ts-ssh/internal/client/ssh"
+	"github.com/derekg/ts-ssh/internal/config"
 	"github.com/derekg/ts-ssh/internal/security"
 )
 
 // Constants needed by SCP package
 const (
-	DefaultSshPort = "22"
+	DefaultSshPort = config.DefaultSSHPort
 )
 
 // Simple T function for temporary internationalization support

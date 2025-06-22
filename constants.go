@@ -1,6 +1,10 @@
 package main
 
-import "time"
+import (
+	"time"
+	
+	"github.com/derekg/ts-ssh/internal/config"
+)
 
 // Network and connection constants
 const (
@@ -9,18 +13,6 @@ const (
 	DefaultSCPTimeout      = 30 * time.Second
 	ConnectionWaitTime     = 3 * time.Second
 	StatusUpdateTimeout    = 5 * time.Second
-	
-	// SSH configuration
-	DefaultSshPort = "22"
-	
-	// Terminal defaults
-	DefaultTerminalWidth   = 80
-	DefaultTerminalHeight  = 24
-	DefaultTerminalType    = "xterm-256color"
-	
-	// Application identifiers
-	ClientName        = "ts-ssh-client"
-	TmuxSessionPrefix = "ts-ssh-"
 	
 	// Buffer sizes
 	DefaultBufferSize     = 4096
@@ -31,22 +23,22 @@ const (
 	MaxPasswordRetries    = 3
 	MaxConcurrentHosts    = 50
 	SessionWaitTimeout    = 5 * time.Second
-	
-	// File permissions
-	DefaultKeyPermissions = 0600
-	DefaultDirPermissions = 0700
 )
 
-// SSH key discovery constants
+// Import shared constants from config package
+const (
+	DefaultSshPort        = config.DefaultSSHPort
+	DefaultTerminalWidth  = config.DefaultTerminalWidth
+	DefaultTerminalHeight = config.DefaultTerminalHeight
+	DefaultTerminalType   = config.DefaultTerminalType
+	ClientName           = config.ClientName
+	DefaultKeyPermissions = config.SecureFilePermissions
+	DefaultDirPermissions = config.SecureDirectoryPermissions
+)
+
+// Import shared variables from config package
 var (
-	// ModernKeyTypes defines SSH key types in order of preference (most secure first).
-	// Ed25519 keys provide the best security and performance, followed by ECDSA,
-	// with RSA maintained for backward compatibility only.
-	ModernKeyTypes = []string{
-		"id_ed25519", // Ed25519 - fastest, most secure, smallest key size
-		"id_ecdsa",   // ECDSA - good performance, secure elliptic curve
-		"id_rsa",     // RSA - legacy support, discouraged for new keys
-	}
+	ModernKeyTypes = config.ModernKeyTypes
 )
 
 // Error messages constants

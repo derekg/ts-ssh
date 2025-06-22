@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -22,21 +23,162 @@ import (
 	"github.com/derekg/ts-ssh/internal/security"
 )
 
-// Temporary stub functions - TODO: Move proper implementations from main package
+// Terminal constants moved from main package
+const (
+	DefaultTerminalWidth  = 80
+	DefaultTerminalHeight = 24
+	DefaultTerminalType   = "xterm-256color"
+)
+
+// startInteractiveSession starts an interactive SSH session with PTY support
 func startInteractiveSession(client *ssh.Client, logger *log.Logger) error {
-	// This is a temporary stub - the real implementation is in main_helpers.go
-	// TODO: Move the full implementation here or create proper cross-package access
-	logger.Println("Interactive session not yet fully refactored in internal package")
-	return fmt.Errorf("interactive session temporarily disabled during refactoring")
+	logger.Println("Starting interactive SSH session...")
+	session, err := CreateSSHSession(client)
+	if err != nil {
+		return fmt.Errorf("failed to create SSH session: %w", err)
+	}
+	defer session.Close()
+
+	// Set up stdin pipe
+	stdinPipe, err := session.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stdin pipe for SSH session: %w", err)
+	}
+	session.Stdout = os.Stdout
+	session.Stderr = os.Stderr
+
+	// Set up terminal if running in one
+	fd := int(os.Stdin.Fd())
+	if term.IsTerminal(fd) {
+		err = setupTerminal(session, fd, logger)
+		if err != nil {
+			return fmt.Errorf("failed to setup terminal: %w", err)
+		}
+	}
+
+	// Start the shell
+	err = session.Shell()
+	if err != nil {
+		return fmt.Errorf("failed to start shell: %w", err)
+	}
+
+	// Handle terminal resizing and escape sequences
+	return handleInteractiveSession(session, stdinPipe, fd, logger)
+}
+
+// setupTerminal configures the terminal for interactive SSH session
+func setupTerminal(session *ssh.Session, fd int, logger *log.Logger) error {
+	termWidth, termHeight, err := term.GetSize(fd)
+	if err != nil {
+		logger.Printf("Warning: Failed to get terminal size: %v. Using default %dx%d.", err, DefaultTerminalWidth, DefaultTerminalHeight)
+		termWidth = DefaultTerminalWidth
+		termHeight = DefaultTerminalHeight
+	}
+	
+	termType := os.Getenv("TERM")
+	if termType == "" {
+		termType = DefaultTerminalType
+	}
+	
+	err = session.RequestPty(termType, termHeight, termWidth, ssh.TerminalModes{})
+	if err != nil {
+		return fmt.Errorf("failed to request pseudo-terminal: %w", err)
+	}
+	
+	return nil
+}
+
+// handleInteractiveSession manages the interactive SSH session with proper terminal handling
+func handleInteractiveSession(session *ssh.Session, stdinPipe io.WriteCloser, fd int, logger *log.Logger) error {
+	// Import GetGlobalTerminalState from main package - this needs to be accessible
+	// For now, create a simple terminal state manager
+	var terminalRestoreFn func() error
+	
+	// Set up terminal in raw mode if we're in a terminal
+	if term.IsTerminal(fd) {
+		oldState, err := term.MakeRaw(fd)
+		if err != nil {
+			logger.Printf("Warning: Failed to set terminal to raw mode: %v", err)
+		} else {
+			terminalRestoreFn = func() error {
+				return term.Restore(fd, oldState)
+			}
+			// Ensure terminal is restored on exit
+			defer func() {
+				if terminalRestoreFn != nil {
+					if err := terminalRestoreFn(); err != nil {
+						logger.Printf("Warning: Failed to restore terminal: %v", err)
+					}
+				}
+			}()
+		}
+		
+		// Show escape sequence info (would need T() function from i18n)
+		fmt.Fprint(os.Stderr, "Use ~. to terminate connection\n")
+	}
+	
+	// Set up signal handling for graceful shutdown
+	done := make(chan bool, 1)
+	go handleInputWithTerminalState(stdinPipe, done, logger)
+	
+	// Handle window resize signals if in terminal
+	if term.IsTerminal(fd) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go WatchWindowSize(fd, session, ctx, logger)
+	}
+	
+	// Wait for session to complete
+	err := session.Wait()
+	done <- true // Signal input handler to stop
+	
+	return err
+}
+
+// handleInputWithTerminalState handles stdin input
+func handleInputWithTerminalState(stdinPipe io.WriteCloser, done chan bool, logger *log.Logger) {
+	defer stdinPipe.Close()
+	
+	// Create a buffered reader for stdin
+	input := make([]byte, 1024)
+	
+	for {
+		select {
+		case <-done:
+			return
+		default:
+			n, err := os.Stdin.Read(input)
+			if err != nil {
+				if err != io.EOF {
+					logger.Printf("Error reading stdin: %v", err)
+				}
+				return
+			}
+			
+			// Write to SSH session
+			_, writeErr := stdinPipe.Write(input[:n])
+			if writeErr != nil {
+				logger.Printf("Error writing to SSH session: %v", writeErr)
+				return
+			}
+		}
+	}
 }
 
 func promptUserViaTTY(prompt string, logger *log.Logger) (string, error) {
-	// This is a temporary stub - the real implementation is in utils.go
-	// TODO: Move the full implementation here or create proper cross-package access
-	fmt.Print(prompt)
-	var response string
-	_, err := fmt.Scanln(&response)
-	return response, err
+	// Try secure TTY access first
+	result, err := security.PromptUserSecurely(prompt)
+	if err != nil {
+		logger.Printf("Warning: Could not use secure TTY for prompt: %v. Falling back to stdin.", err)
+		fmt.Fprint(os.Stderr, "(secure TTY unavailable, reading from stdin): ")
+		var response string
+		_, scanErr := fmt.Scanln(&response)
+		if scanErr != nil {
+			return "", fmt.Errorf("failed to read from stdin fallback: %w", scanErr)
+		}
+		return strings.ToLower(strings.TrimSpace(response)), nil
+	}
+	return strings.ToLower(strings.TrimSpace(result)), nil
 }
 
 // defaultSSHPort is defined in main.go (or should be made accessible globally)

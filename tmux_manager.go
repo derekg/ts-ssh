@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/term"
 
+	"github.com/derekg/ts-ssh/internal/config"
 	"github.com/derekg/ts-ssh/internal/security"
 )
 
@@ -228,9 +229,9 @@ func (tm *TmuxManager) createTemporarySSHConfig(host string) (string, error) {
 		safeHostname = "host" // Fallback if hostname becomes empty after sanitization
 	}
 	
-	// Limit length to prevent filesystem issues (50 chars is reasonable for temp files)
-	if len(safeHostname) > 50 {
-		safeHostname = safeHostname[:50]
+	// Limit length to prevent filesystem issues
+	if len(safeHostname) > config.MaxHostnameLength {
+		safeHostname = safeHostname[:config.MaxHostnameLength]
 	}
 	tempFileName := fmt.Sprintf("/tmp/ts-ssh-config-%s-%s.conf", safeHostname, security.GenerateRandomSuffix())
 	

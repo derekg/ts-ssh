@@ -464,18 +464,25 @@ func parseHostList(args []string) []string {
 		return nil
 	}
 
-	var hosts []string
+	// Pre-calculate capacity to reduce allocations
+	// Estimate based on comma count + number of args
+	capacity := len(args)
 	for _, arg := range args {
-		if strings.Contains(arg, ",") {
-			hosts = append(hosts, strings.Split(arg, ",")...)
-		} else {
-			hosts = append(hosts, arg)
-		}
+		capacity += strings.Count(arg, ",")
 	}
 
-	// Clean up host names
-	for i, host := range hosts {
-		hosts[i] = strings.TrimSpace(host)
+	hosts := make([]string, 0, capacity)
+	for _, arg := range args {
+		if strings.Contains(arg, ",") {
+			parts := strings.Split(arg, ",")
+			// Trim spaces in place to avoid additional allocation
+			for i, part := range parts {
+				parts[i] = strings.TrimSpace(part)
+			}
+			hosts = append(hosts, parts...)
+		} else {
+			hosts = append(hosts, strings.TrimSpace(arg))
+		}
 	}
 
 	return hosts
