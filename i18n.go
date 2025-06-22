@@ -299,6 +299,9 @@ func registerMessages() {
 	message.SetString(language.English, "flag_key_desc", "Path to SSH private key")
 	message.SetString(language.Spanish, "flag_key_desc", "Ruta a clave privada SSH")
 	
+	message.SetString(language.English, "flag_ssh_config_desc", "SSH configuration file")
+	message.SetString(language.Spanish, "flag_ssh_config_desc", "Archivo de configuración SSH")
+	
 	message.SetString(language.English, "flag_tsnet_desc", "Directory to store tsnet state")
 	message.SetString(language.Spanish, "flag_tsnet_desc", "Directorio para almacenar estado tsnet")
 	
@@ -310,6 +313,9 @@ func registerMessages() {
 	
 	message.SetString(language.English, "flag_insecure_desc", "Disable host key checking (INSECURE!)")
 	message.SetString(language.Spanish, "flag_insecure_desc", "Deshabilitar verificación de clave de servidor (¡INSEGURO!)")
+	
+	message.SetString(language.English, "flag_force_insecure_desc", "Skip confirmation for insecure connections (automation only)")
+	message.SetString(language.Spanish, "flag_force_insecure_desc", "Omitir confirmación para conexiones inseguras (solo automatización)")
 	
 	message.SetString(language.English, "flag_forward_desc", "forward stdio to destination host:port (for use as ProxyCommand)")
 	message.SetString(language.Spanish, "flag_forward_desc", "reenviar stdio a servidor:puerto destino (para usar como ComandoProxy)")
@@ -350,6 +356,28 @@ func registerMessages() {
 	
 	message.SetString(language.English, "scp_download_complete", "CLI SCP: Download complete.")
 	message.SetString(language.Spanish, "scp_download_complete", "CLI SCP: Descarga completada.")
+	
+	// Security warning messages for insecure mode
+	message.SetString(language.English, "warning_insecure_mode", "Host key verification disabled!")
+	message.SetString(language.Spanish, "warning_insecure_mode", "¡Verificación de clave de servidor deshabilitada!")
+	
+	message.SetString(language.English, "warning_mitm_vulnerability", "This makes you vulnerable to man-in-the-middle attacks.")
+	message.SetString(language.Spanish, "warning_mitm_vulnerability", "Esto te hace vulnerable a ataques de intermediario (man-in-the-middle).")
+	
+	message.SetString(language.English, "warning_trusted_networks_only", "Only use this in trusted network environments.")
+	message.SetString(language.Spanish, "warning_trusted_networks_only", "Solo usa esto en entornos de red confiables.")
+	
+	message.SetString(language.English, "insecure_mode_forced", "Insecure mode forced via --force-insecure flag.")
+	message.SetString(language.Spanish, "insecure_mode_forced", "Modo inseguro forzado mediante flag --force-insecure.")
+	
+	message.SetString(language.English, "confirm_insecure_connection", "Continue with insecure connection? [y/N]:")
+	message.SetString(language.Spanish, "confirm_insecure_connection", "¿Continuar con conexión insegura? [y/N]:")
+	
+	message.SetString(language.English, "connection_cancelled_by_user", "connection cancelled by user")
+	message.SetString(language.Spanish, "connection_cancelled_by_user", "conexión cancelada por el usuario")
+	
+	message.SetString(language.English, "proceeding_with_insecure_connection", "Proceeding with insecure connection...")
+	message.SetString(language.Spanish, "proceeding_with_insecure_connection", "Procediendo con conexión insegura...")
 }
 
 // T returns a localized string using the global printer thread-safely

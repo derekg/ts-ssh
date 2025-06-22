@@ -6,10 +6,8 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"syscall"
 
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/term"
 )
 
 // Note: SSH key types are now defined in constants.go as ModernKeyTypes
@@ -152,15 +150,15 @@ func createModernSSHAuthMethods(keyPath, sshUser, targetHost string, currentUser
 		}
 	}
 
-	// Add password authentication as fallback
+	// Add password authentication as fallback using secure TTY
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
 		fmt.Print(T("enter_password", sshUser, targetHost))
-		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+		password, err := readPasswordSecurely()
 		fmt.Println()
 		if err != nil {
-			return "", fmt.Errorf("failed to read password: %w", err)
+			return "", fmt.Errorf("failed to read password securely: %w", err)
 		}
-		return string(bytePassword), nil
+		return password, nil
 	}))
 
 	logSafe(logger, "Created %d authentication methods (key-based: %d, password: 1)", 

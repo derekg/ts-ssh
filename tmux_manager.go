@@ -13,11 +13,12 @@ import (
 
 // TmuxManager handles creating and managing tmux sessions for SSH connections
 type TmuxManager struct {
-	logger       *log.Logger
-	sessionName  string
-	sshUser      string
-	sshKeyPath   string
+	logger          *log.Logger
+	sessionName     string
+	sshUser         string
+	sshKeyPath      string
 	insecureHostKey bool
+	tempConfigFiles []string // Track temporary config files for cleanup
 }
 
 // NewTmuxManager creates a new tmux session manager
@@ -89,15 +90,21 @@ func (tm *TmuxManager) killExistingSession() {
 
 // createInitialSession creates the first tmux session with SSH to the first host
 func (tm *TmuxManager) createInitialSession(host string) error {
-	sshCmd := tm.buildSSHCommand(host)
+	sshCmd, configFile, err := tm.buildSecureSSHCommand(host)
+	if err != nil {
+		return err
+	}
+	
+	// Store config file for cleanup
+	tm.tempConfigFiles = append(tm.tempConfigFiles, configFile)
 	
 	// Create new tmux session with SSH command
 	cmd := exec.Command("tmux", "new-session", "-d", "-s", tm.sessionName, "-n", "ssh-1")
 	cmd.Env = os.Environ()
 	
-	tm.logger.Printf("Creating tmux session with command: %s", strings.Join(cmd.Args, " "))
+	tm.logger.Printf("Creating tmux session with secure command (credentials protected)")
 	
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		return err
 	}
@@ -119,11 +126,17 @@ func (tm *TmuxManager) createInitialSessionDryRun(host string) error {
 
 // addWindow adds a new window to the tmux session with SSH to the specified host
 func (tm *TmuxManager) addWindow(windowName, host string) error {
-	sshCmd := tm.buildSSHCommand(host)
+	sshCmd, configFile, err := tm.buildSecureSSHCommand(host)
+	if err != nil {
+		return err
+	}
+	
+	// Store config file for cleanup
+	tm.tempConfigFiles = append(tm.tempConfigFiles, configFile)
 	
 	// Create new window
 	cmd := exec.Command("tmux", "new-window", "-t", tm.sessionName, "-n", windowName)
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		return err
 	}
@@ -142,40 +155,63 @@ func (tm *TmuxManager) sendKeysToWindow(windowName, command string) error {
 	return cmd.Run()
 }
 
-// buildSSHCommand constructs the SSH command for connecting to a host
-func (tm *TmuxManager) buildSSHCommand(host string) string {
-	var sshArgs []string
-	
-	// Add SSH key if specified
-	if tm.sshKeyPath != "" {
-		sshArgs = append(sshArgs, "-i", tm.sshKeyPath)
+// buildSecureSSHCommand constructs a secure SSH command using temporary config files
+// to avoid exposing credentials in process lists
+func (tm *TmuxManager) buildSecureSSHCommand(host string) (string, string, error) {
+	// Create temporary SSH config file to avoid credential exposure
+	tempConfigFile, err := tm.createTemporarySSHConfig(host)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create temporary SSH config: %w", err)
 	}
 	
-	// Add insecure host key option if specified
-	if tm.insecureHostKey {
-		sshArgs = append(sshArgs, "-o", "StrictHostKeyChecking=no")
-		sshArgs = append(sshArgs, "-o", "UserKnownHostsFile=/dev/null")
-	}
-	
-	// Add connection target
-	sshArgs = append(sshArgs, fmt.Sprintf("%s@%s", tm.sshUser, host))
-	
-	// Use our ts-ssh binary instead of regular ssh to get Tailscale connectivity
-	// We'll construct a command that uses our binary in non-TUI mode
+	// Build command using config file instead of command line args
 	cmdParts := []string{os.Args[0]} // Our binary path
+	cmdParts = append(cmdParts, "-F", tempConfigFile) // Use SSH config file
+	cmdParts = append(cmdParts, host) // Just the hostname, config has the rest
 	
-	// Add our flags
+	return strings.Join(cmdParts, " "), tempConfigFile, nil
+}
+
+// createTemporarySSHConfig creates a temporary SSH config file with secure permissions
+func (tm *TmuxManager) createTemporarySSHConfig(host string) (string, error) {
+	// Generate unique filename for temporary config
+	tempFileName := fmt.Sprintf("/tmp/ts-ssh-config-%s-%s.conf", host, generateRandomSuffix())
+	
+	// Create temporary file with secure permissions atomically
+	tempFile, err := createSecureFile(tempFileName, 0600)
+	if err != nil {
+		return "", fmt.Errorf("failed to create secure temporary SSH config: %w", err)
+	}
+	
+	// Generate SSH config content
+	config := fmt.Sprintf(`# Temporary SSH config for ts-ssh tmux session
+Host %s
+    User %s
+`, host, tm.sshUser)
+	
 	if tm.sshKeyPath != "" {
-		cmdParts = append(cmdParts, "-i", tm.sshKeyPath)
+		config += fmt.Sprintf("    IdentityFile %s\n", tm.sshKeyPath)
 	}
+	
 	if tm.insecureHostKey {
-		cmdParts = append(cmdParts, "-insecure")
+		config += "    StrictHostKeyChecking no\n"
+		config += "    UserKnownHostsFile /dev/null\n"
+	} else {
+		config += "    StrictHostKeyChecking yes\n"
 	}
 	
-	// Add the target
-	cmdParts = append(cmdParts, fmt.Sprintf("%s@%s", tm.sshUser, host))
+	config += "    LogLevel QUIET\n"
+	config += "    BatchMode no\n" // Allow password prompts
 	
-	return strings.Join(cmdParts, " ")
+	// Write config to file
+	if _, err := tempFile.WriteString(config); err != nil {
+		tempFile.Close()
+		os.Remove(tempFile.Name())
+		return "", err
+	}
+	
+	tempFile.Close()
+	return tempFile.Name(), nil
 }
 
 // configureTmux sets up tmux configuration for a better multi-session experience
@@ -253,11 +289,30 @@ func (tm *TmuxManager) attachToSession() error {
 	return err
 }
 
-// CleanupSession kills the tmux session
+// CleanupSession kills the tmux session and cleans up temporary files
 func (tm *TmuxManager) CleanupSession() error {
 	tm.logger.Printf("Cleaning up tmux session '%s'", tm.sessionName)
+	
+	// Kill tmux session
 	cmd := exec.Command("tmux", "kill-session", "-t", tm.sessionName)
-	return cmd.Run()
+	err := cmd.Run()
+	
+	// Clean up temporary SSH config files
+	tm.cleanupTempConfigFiles()
+	
+	return err
+}
+
+// cleanupTempConfigFiles removes all temporary SSH config files
+func (tm *TmuxManager) cleanupTempConfigFiles() {
+	for _, configFile := range tm.tempConfigFiles {
+		if err := os.Remove(configFile); err != nil {
+			tm.logger.Printf("Warning: failed to remove temporary config file %s: %v", configFile, err)
+		} else {
+			tm.logger.Printf("Cleaned up temporary config file: %s", configFile)
+		}
+	}
+	tm.tempConfigFiles = nil
 }
 
 // AddHost adds a new host to the existing tmux session

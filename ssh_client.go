@@ -79,12 +79,12 @@ func LoadPrivateKey(path string, logger *log.Logger) (ssh.AuthMethod, error) {
 	if errors.As(err, &passphraseErr) {
 		logger.Printf("SSH key %s is passphrase protected.", path)
 		fmt.Printf("Enter passphrase for key %s: ", path)
-		bytePassword, errRead := term.ReadPassword(int(syscall.Stdin))
+		password, errRead := readPasswordSecurely()
 		fmt.Println()
 		if errRead != nil {
-			return nil, fmt.Errorf("failed to read passphrase: %w", errRead)
+			return nil, fmt.Errorf("failed to read passphrase securely: %w", errRead)
 		}
-		signer, err = ssh.ParsePrivateKeyWithPassphrase(keyBytes, bytePassword)
+		signer, err = ssh.ParsePrivateKeyWithPassphrase(keyBytes, []byte(password))
 		if err != nil {
 			if strings.Contains(err.Error(), "incorrect passphrase") || strings.Contains(err.Error(), "decryption failed") {
 				return nil, fmt.Errorf("incorrect passphrase for key %q", path)
@@ -111,17 +111,10 @@ func CreateKnownHostsCallback(currentUser *user.User, logger *log.Logger) (ssh.H
 	}
 
 	knownHostsPath := filepath.Join(currentUser.HomeDir, ".ssh", "known_hosts")
-	sshDir := filepath.Dir(knownHostsPath)
 
-	if err := os.MkdirAll(sshDir, 0700); err != nil {
-		logger.Printf("Failed to create .ssh directory %s: %v. Known_hosts persistence may fail.", sshDir, err)
-	}
-
-	f, err := os.OpenFile(knownHostsPath, os.O_CREATE|os.O_RDWR, 0600)
-	if err != nil {
-		logger.Printf("Unable to create/open %s: %v. Host key management will be impaired.", knownHostsPath, err)
-	} else {
-		f.Close() 
+	// Create known_hosts file securely to prevent race conditions
+	if err := createSecureKnownHostsFile(knownHostsPath); err != nil {
+		logger.Printf("Unable to create secure known_hosts file %s: %v. Host key management will be impaired.", knownHostsPath, err)
 	}
 
 	hostKeyCallback, err := knownhosts.New(knownHostsPath)

@@ -10,12 +10,10 @@ import (
 	"log"
 	"net"
 	"os/user"
-	"syscall"
 	"time"
 
 	"github.com/bramvdbogaerde/go-scp"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/term" // term is used for password prompt
 	"tailscale.com/tsnet"
 )
 // Removed "fmt" and "os" as they are available from main package context
@@ -65,12 +63,12 @@ func HandleCliScp(
 
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
 		fmt.Print(T("scp_enter_password", sshUser, targetHost))
-		bytePassword, passErr := term.ReadPassword(int(syscall.Stdin))
+		password, passErr := readPasswordSecurely()
 		fmt.Println()
 		if passErr != nil {
-			return "", fmt.Errorf("failed to read password for SCP: %w", passErr)
+			return "", fmt.Errorf("failed to read password securely for SCP: %w", passErr)
 		}
-		return string(bytePassword), nil
+		return password, nil
 	}))
 
 	var hostKeyCallback ssh.HostKeyCallback
@@ -140,11 +138,16 @@ func HandleCliScp(
 	} else { // Download
 		logger.Printf("CLI SCP: Downloading %s@%s:%s to %s", sshUser, targetHost, remotePath, localPath)
 		
-		localFile, errOpen := os.OpenFile(localPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+		// Create file securely with atomic replacement to prevent race conditions
+		localFile, errOpen := createSecureDownloadFileWithReplace(localPath)
 		if errOpen != nil {
-			return fmt.Errorf("CLI SCP: failed to open/create local file %s for download: %w", localPath, errOpen)
+			return fmt.Errorf("CLI SCP: failed to create secure local file %s for download: %w", localPath, errOpen)
 		}
-		defer localFile.Close()
+		defer func() {
+			if err := completeAtomicReplacement(localFile); err != nil {
+				logger.Printf("Warning: failed to complete atomic file replacement: %v", err)
+			}
+		}()
 
 		errCopy := scpCl.CopyFromRemote(ctx, localFile, remotePath)
 		if errCopy != nil {

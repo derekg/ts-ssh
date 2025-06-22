@@ -65,16 +65,53 @@ func parseScpRemoteArg(remoteArg string, defaultSshUser string) (host, path, use
 	return host, path, user, nil
 }
 
+// validateInsecureMode validates and handles insecure host key verification mode
+func validateInsecureMode(insecureHostKey, forceInsecure bool) error {
+	if !insecureHostKey {
+		return nil
+	}
+
+	// Display security warnings
+	fmt.Fprint(os.Stderr, "⚠️  "+T("warning_insecure_mode")+"\n")
+	fmt.Fprint(os.Stderr, "⚠️  "+T("warning_mitm_vulnerability")+"\n")
+	fmt.Fprint(os.Stderr, "⚠️  "+T("warning_trusted_networks_only")+"\n")
+	fmt.Fprint(os.Stderr, "\n")
+
+	// Skip confirmation if force flag is set (for automation)
+	if forceInsecure {
+		fmt.Fprint(os.Stderr, T("insecure_mode_forced")+"\n")
+		return nil
+	}
+
+	// Prompt for user confirmation
+	fmt.Fprint(os.Stderr, T("confirm_insecure_connection")+" ")
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read user input: %w", err)
+	}
+
+	response = strings.ToLower(strings.TrimSpace(response))
+	if response != "y" && response != "yes" {
+		return fmt.Errorf("%s", T("connection_cancelled_by_user"))
+	}
+
+	fmt.Fprint(os.Stderr, T("proceeding_with_insecure_connection")+"\n")
+	return nil
+}
+
 func main() {
 	// --- Command Line Flags ---
 	var (
 		sshUser         string
 		sshKeyPath      string
+		sshConfigFile   string
 		tsnetDir        string
 		tsControlURL    string
 		target          string
 		verbose         bool
 		insecureHostKey bool
+		forceInsecure   bool
 		forwardDest     string
 		showVersion     bool
 		langFlag        string
@@ -109,10 +146,12 @@ func main() {
 	flag.StringVar(&langFlag, "lang", "", T("flag_lang_desc"))
 	flag.StringVar(&sshUser, "l", defaultUser, T("flag_user_desc"))
 	flag.StringVar(&sshKeyPath, "i", defaultKeyPath, T("flag_key_desc"))
+	flag.StringVar(&sshConfigFile, "F", "", T("flag_ssh_config_desc"))
 	flag.StringVar(&tsnetDir, "tsnet-dir", defaultTsnetDir, T("flag_tsnet_desc"))
 	flag.StringVar(&tsControlURL, "control-url", "", T("flag_control_desc"))
 	flag.BoolVar(&verbose, "v", false, T("flag_verbose_desc"))
 	flag.BoolVar(&insecureHostKey, "insecure", false, T("flag_insecure_desc"))
+	flag.BoolVar(&forceInsecure, "force-insecure", false, T("flag_force_insecure_desc"))
 	flag.StringVar(&forwardDest, "W", "", T("flag_forward_desc"))
 	flag.BoolVar(&showVersion, "version", false, T("flag_version_desc"))
 	
@@ -185,6 +224,12 @@ func main() {
 	}
 
 	// Handle power CLI features
+	// Validate insecure mode before any operations
+	if err := validateInsecureMode(insecureHostKey, forceInsecure); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
 	if listHosts || pickHost || multiHosts != "" || execCmd != "" || copyFiles != "" {
 		srv, ctx, status, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose)
 		if err != nil {
@@ -262,6 +307,11 @@ func main() {
 
 	if detectedScpArgs != nil {
 		// SCP mode is active.
+		// Validate insecure mode
+		if err := validateInsecureMode(insecureHostKey, forceInsecure); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 		srv, ctx, _, err := initTsNet(tsnetDir, ClientName, logger, tsControlURL, verbose)
 		if err != nil {
 			fmt.Fprint(os.Stderr, T("error_init_tailscale")+"\n")
@@ -305,6 +355,24 @@ func main() {
 		if verbose { logger.Printf("SSH target user overridden to '%s' from target string.", sshSpecificUser) }
 	}
 	
+	// Apply SSH config file settings if specified
+	if sshConfigFile != "" {
+		err := applySSHConfigToConnection(sshConfigFile, targetHost, &sshSpecificUser, &sshKeyPath, &insecureHostKey)
+		if err != nil {
+			logger.Printf("Warning: failed to parse SSH config file: %v", err)
+		} else if verbose {
+			logger.Printf("Applied SSH config from: %s", sshConfigFile)
+		}
+	}
+	
+	// Apply process security measures to hide credentials
+	hideCredentialsInProcessList()
+	
+	// Validate insecure mode for regular SSH
+	if err := validateInsecureMode(insecureHostKey, forceInsecure); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 	if verbose {
 		logger.Printf("Starting %s (SSH mode)...", ClientName)
 	}
