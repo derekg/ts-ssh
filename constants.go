@@ -37,6 +37,18 @@ const (
 	DefaultDirPermissions = 0700
 )
 
+// SSH key discovery constants
+var (
+	// ModernKeyTypes defines SSH key types in order of preference (most secure first).
+	// Ed25519 keys provide the best security and performance, followed by ECDSA,
+	// with RSA maintained for backward compatibility only.
+	ModernKeyTypes = []string{
+		"id_ed25519", // Ed25519 - fastest, most secure, smallest key size
+		"id_ecdsa",   // ECDSA - good performance, secure elliptic curve
+		"id_rsa",     // RSA - legacy support, discouraged for new keys
+	}
+)
+
 // Error messages constants
 const (
 	ErrEmptyTarget     = "target cannot be empty"
