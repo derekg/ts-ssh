@@ -66,7 +66,7 @@ func parseScpRemoteArg(remoteArg string, defaultSshUser string) (host, path, use
 }
 
 // validateInsecureMode validates and handles insecure host key verification mode
-func validateInsecureMode(insecureHostKey, forceInsecure bool) error {
+func validateInsecureMode(insecureHostKey, forceInsecure bool, host, user string) error {
 	if !insecureHostKey {
 		return nil
 	}
@@ -80,6 +80,8 @@ func validateInsecureMode(insecureHostKey, forceInsecure bool) error {
 	// Skip confirmation if force flag is set (for automation)
 	if forceInsecure {
 		fmt.Fprint(os.Stderr, T("insecure_mode_forced")+"\n")
+		// Log forced insecure mode usage
+		LogInsecureModeUsage(host, user, true, true)
 		return nil
 	}
 
@@ -92,7 +94,12 @@ func validateInsecureMode(insecureHostKey, forceInsecure bool) error {
 	}
 
 	response = strings.ToLower(strings.TrimSpace(response))
-	if response != "y" && response != "yes" {
+	confirmed := response == "y" || response == "yes"
+	
+	// Log insecure mode usage with user decision
+	LogInsecureModeUsage(host, user, false, confirmed)
+	
+	if !confirmed {
 		return fmt.Errorf("%s", T("connection_cancelled_by_user"))
 	}
 
@@ -211,6 +218,13 @@ func main() {
 	// Reinitialize i18n with the actual language flag after parsing
 	initI18n(langFlag)
 
+	// Initialize security audit logging (if enabled via environment variables)
+	if err := initSecurityLogger(); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Failed to initialize security audit logging: %v\n", err)
+	}
+	// Ensure security logger is properly closed on exit
+	defer closeSecurityLogger()
+
 	var logger *log.Logger
 	if verbose {
 		logger = log.Default()
@@ -224,8 +238,8 @@ func main() {
 	}
 
 	// Handle power CLI features
-	// Validate insecure mode before any operations
-	if err := validateInsecureMode(insecureHostKey, forceInsecure); err != nil {
+	// Validate insecure mode before any operations (without specific host/user context)
+	if err := validateInsecureMode(insecureHostKey, forceInsecure, "", ""); err != nil {
 		fmt.Fprintf(os.Stderr, T("error_prefix")+"\n", err)
 		os.Exit(1)
 	}
@@ -307,8 +321,8 @@ func main() {
 
 	if detectedScpArgs != nil {
 		// SCP mode is active.
-		// Validate insecure mode
-		if err := validateInsecureMode(insecureHostKey, forceInsecure); err != nil {
+		// Validate insecure mode with SCP context
+		if err := validateInsecureMode(insecureHostKey, forceInsecure, detectedScpArgs.targetHost, detectedScpArgs.sshUser); err != nil {
 			fmt.Fprintf(os.Stderr, T("error_prefix")+"\n", err)
 			os.Exit(1)
 		}
@@ -369,7 +383,7 @@ func main() {
 	hideCredentialsInProcessList()
 	
 	// Validate insecure mode for regular SSH
-	if err := validateInsecureMode(insecureHostKey, forceInsecure); err != nil {
+	if err := validateInsecureMode(insecureHostKey, forceInsecure, targetHost, sshSpecificUser); err != nil {
 		fmt.Fprintf(os.Stderr, T("error_prefix")+"\n", err)
 		os.Exit(1)
 	}
