@@ -198,6 +198,8 @@ ts-ssh has undergone comprehensive security hardening and is now enterprise-read
 #### Security Audit Documentation
 - **[SECURITY_AUDIT_v0.3.0.md](SECURITY_AUDIT_v0.3.0.md)**: Complete security audit using STRIDE threat modeling
 - **[SECURITY_REMEDIATION_PLAN_v0.3.0.md](SECURITY_REMEDIATION_PLAN_v0.3.0.md)**: Detailed remediation plan for all Priority 1 fixes
+- **[SECURITY_AUDIT_REPORT_v0.4.0.md](SECURITY_AUDIT_REPORT_v0.4.0.md)**: Comprehensive security audit with expert analysis (Latest)
+- **[SECURITY_ARCHITECTURE.md](SECURITY_ARCHITECTURE.md)**: Complete security architecture documentation
 
 #### Resolved Critical Vulnerabilities
 
@@ -289,3 +291,49 @@ go test ./... -bench="Benchmark.*[Ss]ecure"
 5. **Follow modern crypto practices**: Prioritize Ed25519 over RSA keys
 
 The security implementation follows industry best practices and has been validated through comprehensive testing across all supported platforms.
+
+### Current Security Audit Status (v0.4.0)
+
+**Expert Security Assessment: 8.5/10 (Production Ready)**
+
+#### Latest Audit Findings (2025-06-22)
+- **Total Vulnerabilities**: 5 (0 Critical, 0 High, 3 Medium, 2 Low)
+- **Security Posture**: EXCELLENT with Enterprise-Grade Security
+- **Production Status**: ✅ APPROVED for production deployment
+
+#### Outstanding Security Items
+**Medium Priority (Address within 30 days):**
+1. **Hostname Validation**: Implement strict input validation in tmux manager (`tmux_manager.go:151`)
+2. **Secure Temp Files**: Use `os.MkdirTemp()` for temporary SSH configs (`tmux_manager.go:178`)
+3. **Environment Sanitization**: Expand environment variable cleanup (`process_security.go:22-30`)
+
+**Low Priority (Address within 90 days):**
+4. **Dependency Monitoring**: Implement automated vulnerability scanning
+5. **Error Message Sanitization**: Production-safe error handling
+
+#### Security Validation Commands
+```bash
+# Comprehensive security testing
+go test ./... -run "Test.*[Ss]ecure" -v -race
+
+# Cross-platform security validation
+GOOS=windows go test ./... -run "Test.*[Ss]ecure"
+GOOS=darwin go test ./... -run "Test.*[Ss]ecure"
+
+# Security audit logging test
+TS_SSH_SECURITY_AUDIT=1 go test ./... -run "TestSecurity"
+```
+
+#### Security Development Guidelines
+When implementing security fixes or new features:
+
+1. **Input Validation**: All user input must be validated before processing
+2. **Atomic Operations**: File operations must use secure patterns from `secure_file_ops.go`
+3. **Process Security**: Apply credential protection measures early in execution
+4. **Cross-Platform**: Test security implementations on all supported platforms
+5. **Audit Logging**: Enable security logging for testing: `TS_SSH_SECURITY_AUDIT=1`
+
+#### Next Security Review
+- **Scheduled**: Q3 2025 or after major feature releases
+- **Scope**: Full security reassessment including Medium priority fixes
+- **Focus Areas**: Input validation, dependency updates, new feature security
