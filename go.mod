@@ -4,6 +4,7 @@ go 1.24.1
 
 require (
 	github.com/bramvdbogaerde/go-scp v1.5.0
+	github.com/charmbracelet/fang v0.4.0
 	golang.org/x/crypto v0.36.0
 	golang.org/x/term v0.30.0
 	golang.org/x/text v0.23.0

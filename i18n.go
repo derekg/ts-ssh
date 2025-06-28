@@ -404,6 +404,34 @@ func registerMessages() {
 	
 	message.SetString(language.English, "proceeding_with_insecure_connection", "Proceeding with insecure connection...")
 	message.SetString(language.Spanish, "proceeding_with_insecure_connection", "Procediendo con conexión insegura...")
+	
+	// CLI command descriptions for fang
+	message.SetString(language.English, "cli_description", "Secure SSH/SCP client with Tailscale connectivity for enterprise environments")
+	message.SetString(language.Spanish, "cli_description", "Cliente SSH/SCP seguro con conectividad Tailscale para entornos empresariales")
+	
+	message.SetString(language.English, "cmd_connect_desc", "Connect to a remote host via SSH (default command)")
+	message.SetString(language.Spanish, "cmd_connect_desc", "Conectar a un servidor remoto via SSH (comando por defecto)")
+	
+	message.SetString(language.English, "cmd_scp_desc", "Transfer files securely using SCP")
+	message.SetString(language.Spanish, "cmd_scp_desc", "Transferir archivos de forma segura usando SCP")
+	
+	message.SetString(language.English, "cmd_list_desc", "List available Tailscale hosts")
+	message.SetString(language.Spanish, "cmd_list_desc", "Listar servidores Tailscale disponibles")
+	
+	message.SetString(language.English, "cmd_exec_desc", "Execute commands on multiple hosts")
+	message.SetString(language.Spanish, "cmd_exec_desc", "Ejecutar comandos en múltiples servidores")
+	
+	message.SetString(language.English, "cmd_multi_desc", "Multi-host operations with tmux session management")
+	message.SetString(language.Spanish, "cmd_multi_desc", "Operaciones multi-servidor con gestión de sesiones tmux")
+	
+	message.SetString(language.English, "cmd_config_desc", "Manage application configuration")
+	message.SetString(language.Spanish, "cmd_config_desc", "Gestionar configuración de la aplicación")
+	
+	message.SetString(language.English, "cmd_pqc_desc", "Post-quantum cryptography operations and reporting")
+	message.SetString(language.Spanish, "cmd_pqc_desc", "Operaciones y reportes de criptografía post-cuántica")
+	
+	message.SetString(language.English, "cmd_version_desc", "Show version information")
+	message.SetString(language.Spanish, "cmd_version_desc", "Mostrar información de versión")
 }
 
 // T returns a localized string using the global printer thread-safely
