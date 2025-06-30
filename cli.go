@@ -186,11 +186,7 @@ func (c *ConnectCommand) Run(ctx context.Context) error {
 	}
 	
 	// Set up logger
-	if c.Verbose {
-		appConfig.Logger = logger
-	} else {
-		appConfig.Logger = log.New(io.Discard, "", 0)
-	}
+	appConfig.Logger = getLogger(c.Verbose)
 
 	return handleSSHOperation(appConfig)
 }
@@ -258,11 +254,7 @@ func (c *ListCommand) Run(ctx context.Context) error {
 	}
 	
 	// Set up logger
-	if c.Verbose {
-		appConfig.Logger = logger
-	} else {
-		appConfig.Logger = log.New(io.Discard, "", 0)
-	}
+	appConfig.Logger = getLogger(c.Verbose)
 
 	return handlePowerCLI(appConfig)
 }
@@ -292,11 +284,7 @@ func (c *ExecCommand) Run(ctx context.Context) error {
 	}
 
 	// Set up logger
-	if c.Verbose {
-		appConfig.Logger = logger
-	} else {
-		appConfig.Logger = log.New(io.Discard, "", 0)
-	}
+	appConfig.Logger = getLogger(c.Verbose)
 
 	return handlePowerCLI(appConfig)
 }
@@ -325,11 +313,7 @@ func (c *MultiCommand) Run(ctx context.Context) error {
 	}
 
 	// Set up logger
-	if c.Verbose {
-		appConfig.Logger = logger
-	} else {
-		appConfig.Logger = log.New(io.Discard, "", 0)
-	}
+	appConfig.Logger = getLogger(c.Verbose)
 
 	return handlePowerCLI(appConfig)
 }

@@ -408,6 +408,11 @@ func startInteractiveSession(client *ssh.Client, logger *log.Logger) error {
 		}
 	}
 
+	// Print escape sequence message before starting shell (in terminal mode only)
+	if term.IsTerminal(fd) {
+		fmt.Fprint(os.Stderr, T("escape_sequence")+"\n")
+	}
+
 	// Start the shell
 	err = session.Shell()
 	if err != nil {
@@ -457,8 +462,6 @@ func handleInteractiveSession(session *ssh.Session, stdinPipe io.WriteCloser, fd
 				}
 			}()
 		}
-		
-		fmt.Fprint(os.Stderr, T("escape_sequence")+"\n")
 	}
 	
 	// Set up signal handling for graceful shutdown

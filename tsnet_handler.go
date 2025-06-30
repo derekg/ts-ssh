@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	// "net/http" // Removed as it's not used
 	"os"
@@ -15,6 +16,11 @@ import (
 // initTsNet initializes the tsnet server and returns the server instance, context,
 // current Tailscale status, and any error that occurred.
 func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsControlURL string, verbose bool) (*tsnet.Server, context.Context, *ipnstate.Status, error) {
+	// Suppress global logger output in non-verbose mode to prevent tsnet internal logging
+	// This needs to persist for the entire session since tsnet continues logging in background
+	if !verbose {
+		log.SetOutput(io.Discard)
+	}
 	if tsnetDir == "" {
 		// Fallback directory name if user.Current() failed in main or not provided.
 		// This is less ideal as it's not user-specific.
@@ -26,11 +32,19 @@ func initTsNet(tsnetDir string, clientHostname string, logger *log.Logger, tsCon
 		return nil, nil, nil, err
 	}
 
+	// Create tsnet server
 	srv := &tsnet.Server{
 		Dir:        tsnetDir,
 		Hostname:   clientHostname,
-		Logf:       logger.Printf,
 		ControlURL: tsControlURL,
+	}
+	
+	// Set logging behavior based on verbose mode
+	if verbose {
+		srv.Logf = logger.Printf
+	} else {
+		// Explicitly set to a no-op function to prevent fallback to default logger
+		srv.Logf = func(string, ...interface{}) {}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
