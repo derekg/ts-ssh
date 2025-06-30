@@ -11,14 +11,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/charmbracelet/fang"
 	sshclient "github.com/derekg/ts-ssh/internal/client/ssh"
 	"github.com/derekg/ts-ssh/internal/crypto/pqc"
 )
 
 // Global variables
 var (
-	logger *log.Logger
+	logger *log.Logger = log.New(os.Stdout, "", log.LstdFlags)
 )
 
 // scpArgs holds parsed arguments for an SCP operation.
@@ -28,7 +27,7 @@ type scpArgs struct {
 	remotePath string
 	targetHost string
 	sshUser    string
-)
+}
 
 // Config holds all the configuration for the application
 type Config struct {
@@ -119,6 +118,17 @@ type VersionCommand struct {
 
 // Run executes the connect command (default SSH behavior)
 func (c *ConnectCommand) Run(ctx context.Context) error {
+	if c.Help {
+		fmt.Println("Usage: ts-ssh connect [options] [user@]hostname[:port] [command...]")
+		fmt.Println("\nOptions:")
+		fmt.Println("  -u, --user         SSH username")
+		fmt.Println("  -i, --identity     SSH private key file") 
+		fmt.Println("  -v, --verbose      Enable verbose logging")
+		fmt.Println("  --insecure         Skip host key verification")
+		fmt.Println("  --force-insecure   Force insecure mode without confirmation")
+		return nil
+	}
+	
 	if c.Version {
 		return showVersion(c.Config, false, false)
 	}
@@ -141,8 +151,13 @@ func (c *ConnectCommand) Run(ctx context.Context) error {
 		return c.handleProxyCommand(ctx)
 	}
 
+	// Check if target is provided
+	if c.Target == "" {
+		return fmt.Errorf("target hostname required. Usage: ts-ssh connect [user@]hostname[:port]")
+	}
+
 	// Parse target
-	targetHost, targetPort, err := parseTarget(c.Target, DefaultSshPort)
+	targetHost, _, err := parseTarget(c.Target, DefaultSshPort)
 	if err != nil {
 		return fmt.Errorf("%s: %w", T("error_parsing_target"), err)
 	}
@@ -161,7 +176,7 @@ func (c *ConnectCommand) Run(ctx context.Context) error {
 		SSHKeyPath:      c.SSHKeyPath,
 		TsnetDir:        c.TsnetDir,
 		TsControlURL:    c.TsControlURL,
-		Target:          c.Target,
+		Target:          c.Target,  // This is the full target including any user@ prefix
 		Verbose:         c.Verbose,
 		InsecureHostKey: c.InsecureHostKey,
 		ForwardDest:     c.ForwardDest,
@@ -241,6 +256,13 @@ func (c *ListCommand) Run(ctx context.Context) error {
 		ListHosts:    !c.Interactive,
 		PickHost:     c.Interactive,
 	}
+	
+	// Set up logger
+	if c.Verbose {
+		appConfig.Logger = logger
+	} else {
+		appConfig.Logger = log.New(io.Discard, "", 0)
+	}
 
 	return handlePowerCLI(appConfig)
 }
@@ -269,6 +291,13 @@ func (c *ExecCommand) Run(ctx context.Context) error {
 		Parallel:        c.Parallel,
 	}
 
+	// Set up logger
+	if c.Verbose {
+		appConfig.Logger = logger
+	} else {
+		appConfig.Logger = log.New(io.Discard, "", 0)
+	}
+
 	return handlePowerCLI(appConfig)
 }
 
@@ -293,6 +322,13 @@ func (c *MultiCommand) Run(ctx context.Context) error {
 		SSHKeyPath:      c.SSHKeyPath,
 		InsecureHostKey: c.InsecureHostKey,
 		MultiHosts:      c.Hosts,
+	}
+
+	// Set up logger
+	if c.Verbose {
+		appConfig.Logger = logger
+	} else {
+		appConfig.Logger = log.New(io.Discard, "", 0)
 	}
 
 	return handlePowerCLI(appConfig)
@@ -481,32 +517,188 @@ func showVersion(config *Config, short, commit bool) error {
 	return nil
 }
 
-// Create the main CLI application using fang
-func NewCLI() *fang.CLI {
+// SimpleCLI provides a simple CLI implementation
+type SimpleCLI struct {
+	commands map[string]func(context.Context, []string) error
+}
+
+func (c *SimpleCLI) Run(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		return c.commands["help"](ctx, args)
+	}
+
+	cmd := args[0]
+	if fn, ok := c.commands[cmd]; ok {
+		return fn(ctx, args[1:])
+	}
+
+	// Default to connect command for backwards compatibility
+	return c.commands["connect"](ctx, args)
+}
+
+// Create the main CLI application
+func NewCLI() *SimpleCLI {
 	// Initialize i18n early with default language
 	initI18n("")
 	
-	cli := fang.New()
-	cli.Name = ClientName
-	cli.Usage = fmt.Sprintf("%s [command] [flags] [arguments]", ClientName)
-	cli.Description = T("cli_description")
-	cli.Version = version
+	cli := &SimpleCLI{
+		commands: make(map[string]func(context.Context, []string) error),
+	}
 
-	// Set default command to connect
-	connectCmd := &ConnectCommand{Config: &Config{}}
-	cli.SetDefaultCommand(connectCmd)
-
-	// Add subcommands
-	cli.AddCommand("connect", &ConnectCommand{Config: &Config{}}, T("cmd_connect_desc"))
-	cli.AddCommand("scp", &SCPCommand{Config: &Config{}}, T("cmd_scp_desc"))
-	cli.AddCommand("list", &ListCommand{Config: &Config{}}, T("cmd_list_desc"))
-	cli.AddCommand("exec", &ExecCommand{Config: &Config{}}, T("cmd_exec_desc"))
-	cli.AddCommand("multi", &MultiCommand{Config: &Config{}}, T("cmd_multi_desc"))
-	cli.AddCommand("config", &ConfigCommand{Config: &Config{}}, T("cmd_config_desc"))
-	cli.AddCommand("pqc", &PQCCommand{Config: &Config{}}, T("cmd_pqc_desc"))
-	cli.AddCommand("version", &VersionCommand{Config: &Config{}}, T("cmd_version_desc"))
+	// Add commands
+	cli.commands["connect"] = func(ctx context.Context, args []string) error {
+		parsed := parseArgs(args)
+		cmd := &ConnectCommand{Config: parsed.Config}
+		if len(parsed.Positional) > 0 {
+			cmd.Target = parsed.Positional[0]
+			if len(parsed.Positional) > 1 {
+				cmd.Command = parsed.Positional[1:]
+			}
+		}
+		return cmd.Run(ctx)
+	}
+	cli.commands["scp"] = func(ctx context.Context, args []string) error {
+		parsed := parseArgs(args)
+		cmd := &SCPCommand{Config: parsed.Config}
+		if len(parsed.Positional) >= 2 {
+			cmd.Source = parsed.Positional[0]
+			cmd.Destination = parsed.Positional[1]
+		}
+		return cmd.Run(ctx)
+	}
+	cli.commands["list"] = func(ctx context.Context, args []string) error {
+		parsed := parseArgs(args)
+		cmd := &ListCommand{Config: parsed.Config}
+		return cmd.Run(ctx)
+	}
+	cli.commands["exec"] = func(ctx context.Context, args []string) error {
+		parsed := parseArgs(args)
+		cmd := &ExecCommand{Config: parsed.Config}
+		if len(parsed.Positional) > 0 {
+			cmd.Hosts = parsed.Positional
+		}
+		return cmd.Run(ctx)
+	}
+	cli.commands["multi"] = func(ctx context.Context, args []string) error {
+		parsed := parseArgs(args)
+		cmd := &MultiCommand{Config: parsed.Config}
+		return cmd.Run(ctx)
+	}
+	cli.commands["config"] = func(ctx context.Context, args []string) error {
+		parsed := parseArgs(args)
+		cmd := &ConfigCommand{Config: parsed.Config}
+		return cmd.Run(ctx)
+	}
+	cli.commands["pqc"] = func(ctx context.Context, args []string) error {
+		parsed := parseArgs(args)
+		cmd := &PQCCommand{Config: parsed.Config}
+		return cmd.Run(ctx)
+	}
+	cli.commands["version"] = func(ctx context.Context, args []string) error {
+		parsed := parseArgs(args)
+		cmd := &VersionCommand{Config: parsed.Config}
+		return cmd.Run(ctx)
+	}
+	cli.commands["help"] = func(ctx context.Context, args []string) error {
+		fmt.Printf("%s %s\n\n", ClientName, version)
+		fmt.Println(T("cli_description"))
+		fmt.Println("\nCommands:")
+		fmt.Println("  connect    " + T("cmd_connect_desc"))
+		fmt.Println("  scp        " + T("cmd_scp_desc"))
+		fmt.Println("  list       " + T("cmd_list_desc"))
+		fmt.Println("  exec       " + T("cmd_exec_desc"))
+		fmt.Println("  multi      " + T("cmd_multi_desc"))
+		fmt.Println("  config     " + T("cmd_config_desc"))
+		fmt.Println("  pqc        " + T("cmd_pqc_desc"))
+		fmt.Println("  version    " + T("cmd_version_desc"))
+		return nil
+	}
+	cli.commands["-h"] = cli.commands["help"]
+	cli.commands["--help"] = cli.commands["help"]
 
 	return cli
+}
+
+// CommandArgs holds parsed command arguments
+type CommandArgs struct {
+	Config      *Config
+	Positional  []string
+}
+
+// parseArgs parses command line arguments into a Config struct and positional args
+func parseArgs(args []string) *CommandArgs {
+	config := &Config{
+		EnablePQC: true,
+		PQCLevel:  1,
+	}
+	
+	var positional []string
+	
+	// Simple flag parsing
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "-u", "--user":
+			if i+1 < len(args) {
+				config.SSHUser = args[i+1]
+				i++
+			}
+		case "-i", "--identity":
+			if i+1 < len(args) {
+				config.SSHKeyPath = args[i+1]
+				i++
+			}
+		case "-F", "--config":
+			if i+1 < len(args) {
+				config.SSHConfigFile = args[i+1]
+				i++
+			}
+		case "--tsnet-dir":
+			if i+1 < len(args) {
+				config.TsnetDir = args[i+1]
+				i++
+			}
+		case "--control-url":
+			if i+1 < len(args) {
+				config.TsControlURL = args[i+1]
+				i++
+			}
+		case "-v", "--verbose":
+			config.Verbose = true
+		case "--insecure":
+			config.InsecureHostKey = true
+		case "--force-insecure":
+			config.ForceInsecure = true
+		case "--lang":
+			if i+1 < len(args) {
+				config.Language = args[i+1]
+				i++
+			}
+		case "--pqc":
+			config.EnablePQC = true
+		case "--no-pqc":
+			config.EnablePQC = false
+		case "--pqc-level":
+			if i+1 < len(args) {
+				// Parse int value
+				i++
+			}
+		case "-h", "--help":
+			config.Help = true
+		case "--version":
+			config.Version = true
+		default:
+			// If it doesn't start with -, it's a positional argument
+			if !strings.HasPrefix(arg, "-") {
+				positional = append(positional, arg)
+			}
+		}
+	}
+	
+	return &CommandArgs{
+		Config:     config,
+		Positional: positional,
+	}
 }
 
 // Configuration management methods for ConfigCommand

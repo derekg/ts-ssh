@@ -249,13 +249,10 @@ func handleSCPOperation(scpArgs *scpArgs, config *AppConfig) error {
 
 // handleSSHOperation performs a regular SSH connection
 func handleSSHOperation(config *AppConfig) error {
-	// Parse SSH target
-	if len(flag.Args()) < 1 {
-		flag.Usage()
-		os.Exit(1)
+	// Validate target is provided
+	if config.Target == "" {
+		return fmt.Errorf("target hostname required")
 	}
-
-	config.Target = flag.Args()[0]
 	
 	targetHost, targetPort, err := parseTarget(config.Target, DefaultSshPort)
 	if err != nil {

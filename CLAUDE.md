@@ -4,11 +4,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ts-ssh is a Go-based SSH and SCP client that uses Tailscale's `tsnet` library to provide userspace connectivity to Tailscale networks without requiring a full Tailscale daemon. The project enables secure SSH connections and file transfers over a Tailnet with enterprise-grade security and comprehensive cross-platform support.
+ts-ssh is a Go-based SSH and SCP client that uses Tailscale's `tsnet` library to provide userspace connectivity to Tailscale networks without requiring a full Tailscale daemon. The project enables secure SSH connections and file transfers over a Tailnet with enterprise-grade security, comprehensive cross-platform support, and a modern CLI experience powered by Charmbracelet's Fang framework.
 
 ## Guidance Notes
 
 - **Quality Score Tracking**: Do not store quality scores in any artifacts, including markdown files, code comments, commit messages, or pull request descriptions. Quality metrics, including security assessments, should be reported back to the project lead but not memorialized in project artifacts.
+
+## CLI Architecture
+
+ts-ssh supports dual CLI modes for optimal user experience:
+
+### Modern CLI (Default)
+- Powered by Charmbracelet Fang framework
+- Enhanced styling with Lipgloss
+- Interactive prompts with Huh
+- Structured subcommand architecture
+- Better help organization and styling
+
+### Legacy CLI
+- Original interface for backward compatibility
+- Script-friendly for automation
+- Controlled via `TS_SSH_LEGACY_CLI=1` environment variable
+- Auto-detection for legacy usage patterns
+
+## Release Considerations
+
+- Ensure the `--version` flag works correctly during release builds
+- Verify proper version flag implementation when cross-compiling for different platforms
 
 ## Common Commands
 
@@ -29,6 +51,14 @@ go test ./... -run "Test.*[Aa]uth"          # Authentication tests only
 
 # Run tests with verbose output
 go test ./... -v
+
+# Run tests with coverage
+go test ./... -cover
+
+# Test specific modules that previously had 0% coverage
+go test ./internal/errors/... -v -cover     # Error handling (84.6% coverage)
+go test ./internal/config/... -v -cover     # Configuration constants
+go test ./internal/client/scp/... -v -cover # SCP client (11.2% coverage)
 
 # Run security benchmarks
 go test ./... -bench="Benchmark.*[Ss]ecure"
@@ -60,9 +90,96 @@ go test ./... -race
 ```
 
 ### Run Application
+
+#### Modern CLI (Default)
 ```bash
-./ts-ssh [user@]hostname[:port] [command...]
-./ts-ssh -h  # for help
+# Subcommand structure with enhanced styling
+./ts-ssh connect [user@]hostname[:port] [-- command...]
+./ts-ssh list                           # Beautiful host listing
+./ts-ssh multi host1,host2,host3        # Enhanced tmux experience
+./ts-ssh exec --command "uptime" host1,host2  # Styled command execution
+./ts-ssh copy file.txt host1:/tmp/      # Enhanced file operations
+./ts-ssh pick                           # Interactive host picker
+./ts-ssh --help                         # Styled help output
 ```
 
-[... rest of the existing file content remains unchanged ...]
+#### Legacy CLI (Backward Compatible)
+```bash
+# Original interface for scripts and automation
+export TS_SSH_LEGACY_CLI=1
+./ts-ssh [user@]hostname[:port] [command...]
+./ts-ssh --list                         # Original host listing
+./ts-ssh --multi host1,host2,host3      # Original tmux
+./ts-ssh --exec "uptime" host1,host2    # Original command execution
+./ts-ssh --copy file.txt host1:/tmp/    # Original file operations
+./ts-ssh --pick                         # Original host picker
+./ts-ssh -h                             # Original help
+```
+
+#### CLI Mode Control
+```bash
+# Force legacy mode permanently
+export TS_SSH_LEGACY_CLI=1
+
+# One-time legacy mode usage
+TS_SSH_LEGACY_CLI=1 ./ts-ssh --list
+
+# Check current mode (modern CLI will show subcommands)
+./ts-ssh --help
+```
+
+## Key Dependencies
+
+### Core Libraries
+- **Charmbracelet Fang**: CLI framework for enhanced user experience
+- **Charmbracelet Lipgloss**: Terminal styling and color management
+- **Charmbracelet Huh**: Interactive prompts and user input
+- **Spf13 Cobra**: Underlying command structure (via Fang)
+- **Tailscale**: Core networking and `tsnet` integration
+- **golang.org/x/crypto/ssh**: SSH client implementation
+- **golang.org/x/text**: Internationalization support
+
+### Development Patterns
+```bash
+# When adding new features, ensure both CLI modes work
+go run . connect hostname          # Test modern CLI
+TS_SSH_LEGACY_CLI=1 go run . hostname  # Test legacy CLI
+
+# Test internationalization (11 supported languages)
+LANG=es go run . --help            # Spanish interface
+LANG=zh go run . --help            # Chinese interface
+LANG=de go run . --help            # German interface
+LANG=fr go run . --help            # French interface
+LANG=pt go run . --help            # Portuguese interface
+LANG=ru go run . --help            # Russian interface
+LANG=ja go run . --help            # Japanese interface
+LANG=hi go run . --help            # Hindi interface
+LANG=ar go run . --help            # Arabic interface
+LANG=bn go run . --help            # Bengali interface
+LANG=en go run . --help            # English interface (default)
+
+# Validate security across platforms
+GOOS=windows go test ./internal/security/...
+GOOS=darwin go test ./internal/security/...
+GOOS=linux go test ./internal/security/...
+```
+
+## Code Quality Standards
+
+### Linting and Formatting
+```bash
+# Format code (required before commits)
+go fmt ./...
+
+# Run linter (should show no issues)
+golangci-lint run
+
+# Vet for potential issues
+go vet ./...
+```
+
+### Test Coverage Expectations
+- **Error handling**: Target 80%+ coverage (currently 84.6%)
+- **Security modules**: 100% coverage required
+- **Core functionality**: 70%+ coverage minimum
+- **Configuration**: Comprehensive constant validation required

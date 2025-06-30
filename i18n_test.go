@@ -159,3 +159,87 @@ func TestI18nThreadSafety(t *testing.T) {
 		t.Fatal("Timeout waiting for i18n thread safety test")
 	}
 }
+
+func TestI18nNewLanguages(t *testing.T) {
+	// Test new language support
+	testCases := []struct {
+		lang string
+		key  string
+		shouldExist bool
+	}{
+		{"zh", "no_peers_found", true},
+		{"hi", "no_peers_found", true},
+		{"ar", "no_peers_found", true},
+		{"bn", "no_peers_found", true},
+		{"pt", "no_peers_found", true},
+		{"ru", "no_peers_found", true},
+		{"ja", "no_peers_found", true},
+		{"de", "no_peers_found", true},
+		{"fr", "no_peers_found", true},
+		{"zh", "flag_lang_desc", true},
+		{"de", "flag_lang_desc", true},
+		{"fr", "flag_lang_desc", true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.lang+"_"+tc.key, func(t *testing.T) {
+			initI18n(tc.lang)
+			result := T(tc.key)
+			
+			if tc.shouldExist {
+				if result == tc.key {
+					t.Errorf("Translation for key '%s' in language '%s' not found", tc.key, tc.lang)
+				}
+				// Verify it's different from English
+				initI18n("en")
+				english := T(tc.key)
+				if result == english && tc.lang != "en" {
+					t.Errorf("Translation for '%s' in '%s' is same as English", tc.key, tc.lang)
+				}
+			}
+		})
+	}
+}
+
+func TestI18nLanguageNormalization(t *testing.T) {
+	// Test language normalization for new languages
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{"zh", "zh"},
+		{"chinese", "zh"},
+		{"中文", "zh"},
+		{"zh-CN", "zh"},
+		{"de", "de"},
+		{"german", "de"},
+		{"deutsch", "de"},
+		{"de-DE", "de"},
+		{"fr", "fr"},
+		{"french", "fr"},
+		{"français", "fr"},
+		{"fr-FR", "fr"},
+		{"pt", "pt"},
+		{"portuguese", "pt"},
+		{"pt-BR", "pt"},
+		{"ru", "ru"},
+		{"russian", "ru"},
+		{"ja", "ja"},
+		{"japanese", "ja"},
+		{"hi", "hi"},
+		{"hindi", "hi"},
+		{"ar", "ar"},
+		{"arabic", "ar"},
+		{"bn", "bn"},
+		{"bengali", "bn"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.input, func(t *testing.T) {
+			result := normalizeLanguage(tc.input)
+			if result != tc.expected {
+				t.Errorf("normalizeLanguage(%q) = %q, want %q", tc.input, result, tc.expected)
+			}
+		})
+	}
+}

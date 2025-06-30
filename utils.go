@@ -144,11 +144,11 @@ func validateInsecureMode(insecureHostKey, forceInsecure bool, host, user string
 	// Get user confirmation
 	response, err := promptUserViaTTY(T("confirm_insecure_connection")+" ", log.New(os.Stderr, "", 0))
 	if err != nil {
-		return fmt.Errorf(T("failed_read_user_input"), err)
+		return fmt.Errorf("%s: %w", T("failed_read_user_input"), err)
 	}
 
 	if response != "y" && response != "yes" {
-		return fmt.Errorf(T("connection_cancelled_by_user"))
+		return fmt.Errorf("%s", T("connection_cancelled_by_user"))
 	}
 
 	fmt.Fprint(os.Stderr, T("proceeding_with_insecure_connection")+"\n\n")
