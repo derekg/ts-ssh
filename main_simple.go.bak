@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
-	"strings"
 
 	"github.com/derekg/ts-ssh/internal/security"
 )
@@ -20,47 +20,6 @@ func main() {
 	// Ensure security logger is properly closed on exit
 	defer security.CloseSecurityLogger()
 
-	// Check if we should use the legacy CLI (for backwards compatibility)
-	if shouldUseLegacyCLI() {
-		runLegacyCLI()
-		return
-	}
-
-	// Use the new Fang-enhanced CLI
-	ctx := context.Background()
-	if err := ExecuteWithFang(ctx); err != nil {
-		// Don't print the error here as Fang will handle it with proper styling
-		os.Exit(1)
-	}
-}
-
-// shouldUseLegacyCLI determines if we should use the legacy CLI
-// This can be controlled by an environment variable for compatibility
-func shouldUseLegacyCLI() bool {
-	// Check for explicit legacy mode
-	if os.Getenv("TS_SSH_LEGACY_CLI") == "1" {
-		return true
-	}
-	
-	// Check if the command line looks like it's using the old style
-	// (this helps with backwards compatibility during transition)
-	if len(os.Args) > 1 {
-		firstArg := os.Args[1]
-		// If first arg starts with user@ or contains :, it's likely a connection target
-		if strings.Contains(firstArg, "@") || 
-		   (strings.Contains(firstArg, ":") && !strings.HasPrefix(firstArg, "-")) {
-			// Insert "connect" subcommand for backwards compatibility
-			newArgs := []string{os.Args[0], "connect"}
-			newArgs = append(newArgs, os.Args[1:]...)
-			os.Args = newArgs
-		}
-	}
-	
-	return false
-}
-
-// runLegacyCLI runs the original simple CLI implementation
-func runLegacyCLI() {
 	// Create the CLI application
 	cli := NewCLI()
 
@@ -76,8 +35,7 @@ func runLegacyCLI() {
 	// Run the CLI
 	ctx := context.Background()
 	if err := cli.Run(ctx, os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("Error: %v", err)
 	}
 }
 

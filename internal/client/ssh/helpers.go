@@ -121,6 +121,18 @@ func createSSHConfig(config SSHConnectionConfig) (*ssh.ClientConfig, error) {
 		Auth:            authMethods,
 		HostKeyCallback: hostKeyCallback,
 		Timeout:         DefaultSSHTimeout,
+		Config: ssh.Config{
+			// Set default key exchanges to match what OpenSSH client typically supports
+			KeyExchanges: []string{
+				"curve25519-sha256",
+				"curve25519-sha256@libssh.org",
+				"ecdh-sha2-nistp256",
+				"ecdh-sha2-nistp384",
+				"ecdh-sha2-nistp521",
+				"diffie-hellman-group14-sha256",
+				"diffie-hellman-group16-sha512",
+			},
+		},
 	}
 	
 	// Apply PQC configuration if provided
@@ -169,7 +181,7 @@ func EstablishSSHConnection(srv *tsnet.Server, ctx context.Context, config SSHCo
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, sshTargetAddr, sshConfig)
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("%s", T("ssh_connection_failed"))
+		return nil, fmt.Errorf("%s: %w", T("ssh_connection_failed"), err)
 	}
 
 	client := ssh.NewClient(sshConn, chans, reqs)

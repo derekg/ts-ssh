@@ -1,6 +1,6 @@
 # ts-ssh: Herramienta CLI SSH/SCP Potente para Tailscale
 
-Un cliente SSH de línea de comandos optimizado y utilidad SCP que se conecta a tu red Tailscale usando `tsnet`. Incluye operaciones multi-servidor potentes, ejecución de comandos por lotes, e integración real con tmux - todo sin requerir el daemon completo de Tailscale.
+Un cliente SSH de línea de comandos optimizado y utilidad SCP que se conecta a tu red Tailscale usando `tsnet`. Incluye operaciones multi-servidor potentes, ejecución de comandos por lotes, integración real con tmux, y una experiencia CLI moderna y hermosa - todo sin requerir el daemon completo de Tailscale.
 
 Perfecto para equipos DevOps que necesitan acceso SSH rápido y confiable a través de su infraestructura Tailscale.
 
@@ -24,9 +24,46 @@ Perfecto para equipos DevOps que necesitan acceso SSH rápido y confiable a trav
 ### 🛠️ Características DevOps Profesionales
 *   **Soporte ProxyCommand** (`-W`) para integración con herramientas estándar
 *   **Multiplataforma**: Linux, macOS (Intel/ARM), Windows
+*   **Experiencia CLI Moderna**: Estilo hermoso con framework Charmbracelet Fang
+*   **Selección Interactiva de Servidores**: Selector mejorado con mejor UX
+*   **Compatibilidad Legacy**: Compatibilidad completa hacia atrás para scripts existentes
 *   **Inicio rápido** - sin frameworks de UI o inicialización compleja
 *   **Comandos componibles** - funciona perfectamente en scripts y automatización
 *   **Manejo claro de errores** y retroalimentación útil
+
+## Modos CLI
+
+ts-ssh soporta dos modos CLI para proporcionar tanto experiencia de usuario moderna como compatibilidad completa hacia atrás:
+
+### 🎨 CLI Moderna (Predeterminada)
+La experiencia CLI mejorada impulsada por el framework Fang de Charmbracelet proporciona:
+- **Estilo hermoso** con colores consistentes y formato
+- **Selección interactiva de servidores** con UX mejorada
+- **Subcomandos estructurados** para funcionalidad organizada
+- **Ayuda mejorada** con salida estilizada y mejor organización
+
+```bash
+# Ejemplos de uso CLI moderna
+ts-ssh connect usuario@servidor           # Conexión SSH mejorada
+ts-ssh list --verbose                     # Listado de servidores estilizado
+ts-ssh multi web1,web2,db1               # Experiencia multi-servidor mejorada
+ts-ssh copy archivo.txt servidor1,servidor2:/tmp/ # Operaciones de archivo mejoradas
+```
+
+### 🔧 CLI Legacy
+Perfecto para scripts existentes y automatización que depende de la interfaz original:
+
+```bash
+# Forzar modo legacy con variable de entorno
+export TS_SSH_LEGACY_CLI=1
+ts-ssh --list                             # Comportamiento CLI original
+ts-ssh usuario@servidor                   # Patrones de uso clásicos
+```
+
+**Detección Automática:**
+- El modo legacy se activa automáticamente para patrones de uso amigables con scripts
+- El modo moderno proporciona experiencia mejorada para uso interactivo
+- Anular con variable de entorno `TS_SSH_LEGACY_CLI=1` cuando sea necesario
 
 ## Prerrequisitos
 
@@ -241,6 +278,15 @@ ts-ssh --parallel --exec "uptime && free -h && df -h" web1,web2,db1,db2 --lang e
 ### Idiomas Soportados
 - **Inglés**: `en`, `english`, `en_us`, `en-us`
 - **Español**: `es`, `spanish`, `español`, `es_es`, `es-es`, `es_mx`, `es-mx`
+- **Chino**: `zh`, `chinese`, `中文`, `zh-cn`, `zh-tw`
+- **Hindi**: `hi`, `hindi`, `हिन्दी`
+- **Árabe**: `ar`, `arabic`, `العربية`
+- **Bengalí**: `bn`, `bengali`, `বাংলা`
+- **Portugués**: `pt`, `portuguese`, `português`, `pt-br`
+- **Ruso**: `ru`, `russian`, `русский`
+- **Japonés**: `ja`, `japanese`, `日本語`
+- **Alemán**: `de`, `german`, `deutsch`
+- **Francés**: `fr`, `french`, `français`
 
 ### Ejemplos de Configuración
 ```bash

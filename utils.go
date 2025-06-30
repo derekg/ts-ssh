@@ -92,3 +92,65 @@ func promptUserViaTTY(prompt string, logger *log.Logger) (string, error) {
 	}
 	return strings.ToLower(strings.TrimSpace(result)), nil
 }
+
+// parseScpRemoteArg parses an SCP remote argument string (e.g., "user@host:path" or "host:path")
+// It returns the host, path, and user. If user is not in the string, it returns the default SSH user.
+func parseScpRemoteArg(remoteArg string, defaultSshUser string) (host, path, user string, err error) {
+	user = defaultSshUser // Start with the default/flag-provided user
+
+	parts := strings.SplitN(remoteArg, ":", 2)
+	if len(parts) != 2 || parts[1] == "" { // Ensure path part exists
+		return "", "", "", fmt.Errorf("%s", T("invalid_scp_remote"))
+	}
+	path = parts[1]
+	hostPart := parts[0]
+
+	if strings.Contains(hostPart, "@") {
+		// Split user@host
+		userHostParts := strings.SplitN(hostPart, "@", 2)
+		if len(userHostParts) != 2 {
+			return "", "", "", fmt.Errorf("%s", T("invalid_user_host"))
+		}
+		user = userHostParts[0]
+		host = userHostParts[1]
+	} else {
+		host = hostPart
+	}
+
+	if host == "" {
+		return "", "", "", fmt.Errorf("%s", T("empty_host_scp"))
+	}
+	return host, path, user, nil
+}
+
+// validateInsecureMode validates and handles insecure host key verification mode
+func validateInsecureMode(insecureHostKey, forceInsecure bool, host, user string) error {
+	if !insecureHostKey {
+		return nil
+	}
+
+	// Display security warnings
+	fmt.Fprint(os.Stderr, "⚠️  "+T("warning_insecure_mode")+"\n")
+	fmt.Fprint(os.Stderr, "⚠️  "+T("warning_mitm_vulnerability")+"\n")
+	fmt.Fprint(os.Stderr, "⚠️  "+T("warning_trusted_networks_only")+"\n")
+	fmt.Fprint(os.Stderr, "\n")
+
+	if forceInsecure {
+		fmt.Fprint(os.Stderr, T("insecure_mode_forced")+"\n")
+		fmt.Fprint(os.Stderr, T("proceeding_with_insecure_connection")+"\n\n")
+		return nil
+	}
+
+	// Get user confirmation
+	response, err := promptUserViaTTY(T("confirm_insecure_connection")+" ", log.New(os.Stderr, "", 0))
+	if err != nil {
+		return fmt.Errorf("%s: %w", T("failed_read_user_input"), err)
+	}
+
+	if response != "y" && response != "yes" {
+		return fmt.Errorf("%s", T("connection_cancelled_by_user"))
+	}
+
+	fmt.Fprint(os.Stderr, T("proceeding_with_insecure_connection")+"\n\n")
+	return nil
+}
