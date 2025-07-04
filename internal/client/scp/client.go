@@ -16,6 +16,7 @@ import (
 
 	sshclient "github.com/derekg/ts-ssh/internal/client/ssh"
 	"github.com/derekg/ts-ssh/internal/config"
+	"github.com/derekg/ts-ssh/internal/i18n"
 	"github.com/derekg/ts-ssh/internal/security"
 )
 
@@ -23,26 +24,6 @@ import (
 const (
 	DefaultSshPort = config.DefaultSSHPort
 )
-
-// Simple T function for temporary internationalization support
-// TODO: Replace with proper i18n integration
-func T(key string, args ...interface{}) string {
-	translations := map[string]string{
-		"scp_empty_path":       "SCP path cannot be empty",
-		"scp_enter_password":   "Enter password for %s@%s: ",
-		"dial_via_tsnet":       "Connecting via tsnet...",
-		"dial_failed":          "Connection failed",
-		"scp_host_key_warning": "WARNING: SCP host key verification disabled",
-	}
-
-	if msg, ok := translations[key]; ok {
-		if len(args) > 0 {
-			return fmt.Sprintf(msg, args...)
-		}
-		return msg
-	}
-	return key
-}
 
 // Removed "fmt" and "os" as they are available from main package context
 // Removed "golang.org/x/crypto/ssh/knownhosts" as it's not directly used here
@@ -67,7 +48,7 @@ func HandleCliScp(
 		targetHost, sshUser, localPath, remotePath, isUpload, sshKeyPath)
 
 	if localPath == "" || remotePath == "" {
-		return errors.New(T("scp_empty_path"))
+		return errors.New(i18n.T("scp_empty_path"))
 	}
 
 	// Ensure defaultSSHPort is accessible. For now, define locally if not shared.
@@ -90,7 +71,7 @@ func HandleCliScp(
 	}
 
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		fmt.Print(T("scp_enter_password", sshUser, targetHost))
+		fmt.Print(i18n.T("scp_enter_password", sshUser, targetHost))
 		password, passErr := security.ReadPasswordSecurely()
 		fmt.Println()
 		if passErr != nil {
@@ -102,7 +83,7 @@ func HandleCliScp(
 	var hostKeyCallback ssh.HostKeyCallback
 	var hkErr error
 	if insecureHostKey {
-		logger.Println(T("scp_host_key_warning"))
+		logger.Println(i18n.T("scp_host_key_warning"))
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	} else {
 		// Call the exported function from ssh_client.go
@@ -162,7 +143,7 @@ func HandleCliScp(
 		if errCopy != nil {
 			return fmt.Errorf("CLI SCP: error uploading file: %w", errCopy)
 		}
-		logger.Println(T("scp_upload_complete"))
+		logger.Println(i18n.T("scp_upload_complete"))
 	} else { // Download
 		logger.Printf("CLI SCP: Downloading %s@%s:%s to %s", sshUser, targetHost, remotePath, localPath)
 
@@ -185,7 +166,7 @@ func HandleCliScp(
 			}
 			return fmt.Errorf("CLI SCP: error downloading file: %w", errCopy)
 		}
-		logger.Println(T("scp_download_complete"))
+		logger.Println(i18n.T("scp_download_complete"))
 	}
 	return nil
 }

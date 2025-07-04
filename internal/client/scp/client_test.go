@@ -6,6 +6,8 @@ import (
 	"log"
 	"os/user"
 	"testing"
+
+	"github.com/derekg/ts-ssh/internal/i18n"
 )
 
 // TestConstants verifies SCP constants are defined correctly
@@ -55,7 +57,7 @@ func TestTranslationFunction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := T(tt.key, tt.args...)
+			result := i18n.T(tt.key, tt.args...)
 			if result != tt.expected {
 				t.Errorf("T(%s, %v) = %s, want %s", tt.key, tt.args, result, tt.expected)
 			}

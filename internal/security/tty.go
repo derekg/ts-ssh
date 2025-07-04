@@ -6,33 +6,16 @@ import (
 	"os"
 
 	"golang.org/x/term"
+
+	"github.com/derekg/ts-ssh/internal/i18n"
 )
-
-// Simple T function for temporary internationalization support
-// TODO: Replace with proper i18n integration
-func T(key string, args ...interface{}) string {
-	// Basic English translations for now
-	translations := map[string]string{
-		"tty_path_validation_failed":  "TTY path validation failed",
-		"tty_ownership_check_failed":  "TTY ownership check failed",
-		"tty_permission_check_failed": "TTY permission check failed",
-	}
-
-	if msg, ok := translations[key]; ok {
-		if len(args) > 0 {
-			return fmt.Sprintf(msg, args...)
-		}
-		return msg
-	}
-	return key // fallback to key if no translation
-}
 
 // getSecureTTY validates and opens a secure TTY connection
 // This prevents TTY hijacking and input redirection attacks
 func getSecureTTY() (*os.File, error) {
 	// First, verify we're running in a real terminal
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		return nil, errors.New(T("not_running_in_terminal"))
+		return nil, errors.New(i18n.T("not_running_in_terminal"))
 	}
 
 	// Get TTY path with validation
@@ -43,13 +26,13 @@ func getSecureTTY() (*os.File, error) {
 
 	// Validate TTY security before opening
 	if err := validateTTYSecurity(ttyPath); err != nil {
-		return nil, fmt.Errorf(T("tty_security_validation_failed"), err)
+		return nil, fmt.Errorf(i18n.T("tty_security_validation_failed"), err)
 	}
 
 	// Open TTY with explicit permissions check
 	ttyFile, err := os.OpenFile(ttyPath, os.O_RDWR, 0)
 	if err != nil {
-		return nil, fmt.Errorf(T("failed_open_tty"), err)
+		return nil, fmt.Errorf(i18n.T("failed_open_tty"), err)
 	}
 
 	// Additional security check after opening

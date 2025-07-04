@@ -13,6 +13,7 @@ import (
 
 	"github.com/derekg/ts-ssh/internal/config"
 	"github.com/derekg/ts-ssh/internal/crypto/pqc"
+	"github.com/derekg/ts-ssh/internal/i18n"
 )
 
 // Constants needed by SSH package
@@ -30,24 +31,6 @@ var (
 const (
 	DefaultSSHTimeout = 15 * time.Second
 )
-
-// Simple T function for temporary internationalization support
-// TODO: Replace with proper i18n integration
-func T(key string, args ...interface{}) string {
-	translations := map[string]string{
-		"host_key_warning": "WARNING: Host key verification is disabled",
-		"dial_via_tsnet":   "Connecting via tsnet...",
-		"ssh_handshake":    "Performing SSH handshake...",
-	}
-
-	if msg, ok := translations[key]; ok {
-		if len(args) > 0 {
-			return fmt.Sprintf(msg, args...)
-		}
-		return msg
-	}
-	return key
-}
 
 // SSHConnectionConfig holds all the parameters needed for SSH connection setup
 type SSHConnectionConfig struct {
@@ -105,7 +88,7 @@ func createSSHConfig(config SSHConnectionConfig) (*ssh.ClientConfig, error) {
 	var hostKeyCallback ssh.HostKeyCallback
 	if config.InsecureHostKey {
 		if config.Logger != nil {
-			config.Logger.Printf("%s", T("host_key_warning"))
+			config.Logger.Printf("%s", i18n.T("host_key_warning"))
 		}
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	} else {
@@ -168,26 +151,26 @@ func EstablishSSHConnection(srv *tsnet.Server, ctx context.Context, config SSHCo
 	sshTargetAddr := net.JoinHostPort(config.TargetHost, config.TargetPort)
 
 	if config.Logger != nil {
-		config.Logger.Printf("%s", T("dial_via_tsnet"))
+		config.Logger.Printf("%s", i18n.T("dial_via_tsnet"))
 	}
 
 	// Dial via tsnet
 	conn, err := srv.Dial(ctx, "tcp", sshTargetAddr)
 	if err != nil {
-		return nil, fmt.Errorf("%s", T("dial_failed"))
+		return nil, fmt.Errorf("%s", i18n.T("dial_failed"))
 	}
 
 	// Establish SSH connection
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, sshTargetAddr, sshConfig)
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("%s: %w", T("ssh_connection_failed"), err)
+		return nil, fmt.Errorf("%s: %w", i18n.T("ssh_connection_failed"), err)
 	}
 
 	client := ssh.NewClient(sshConn, chans, reqs)
 
 	if config.Logger != nil {
-		config.Logger.Printf("%s", T("ssh_connection_established"))
+		config.Logger.Printf("%s", i18n.T("ssh_connection_established"))
 	}
 
 	return client, nil
