@@ -17,7 +17,7 @@ func handleSignalsAndResizeWithTerminalState(session *ssh.Session, termState *Te
 	// Set up signal channel for SIGWINCH (window resize)
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGWINCH)
-	
+
 	for {
 		select {
 		case <-sigCh:

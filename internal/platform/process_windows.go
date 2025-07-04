@@ -9,7 +9,7 @@ func maskProcessTitlePlatform(title string) {
 	// Windows doesn't have the same prctl mechanism as Linux
 	// The main security benefit comes from using SSH config files
 	// instead of command line arguments
-	
+
 	// Potential Windows-specific implementations could use:
 	// - SetConsoleTitle() for console applications
 	// - Process name changes via Windows APIs

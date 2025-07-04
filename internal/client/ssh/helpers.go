@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"tailscale.com/tsnet"
-	
+
 	"github.com/derekg/ts-ssh/internal/config"
 	"github.com/derekg/ts-ssh/internal/crypto/pqc"
 )
@@ -36,10 +36,10 @@ const (
 func T(key string, args ...interface{}) string {
 	translations := map[string]string{
 		"host_key_warning": "WARNING: Host key verification is disabled",
-		"dial_via_tsnet": "Connecting via tsnet...",
-		"ssh_handshake": "Performing SSH handshake...",
+		"dial_via_tsnet":   "Connecting via tsnet...",
+		"ssh_handshake":    "Performing SSH handshake...",
 	}
-	
+
 	if msg, ok := translations[key]; ok {
 		if len(args) > 0 {
 			return fmt.Sprintf(msg, args...)
@@ -134,7 +134,7 @@ func createSSHConfig(config SSHConnectionConfig) (*ssh.ClientConfig, error) {
 			},
 		},
 	}
-	
+
 	// Apply PQC configuration if provided
 	if config.PQCConfig != nil {
 		pqc.ConfigureSSHConfig(sshConfig, config.PQCConfig)
@@ -142,7 +142,7 @@ func createSSHConfig(config SSHConnectionConfig) (*ssh.ClientConfig, error) {
 			config.Logger.Printf("PQC: Post-quantum cryptography enabled (level: %d)", config.PQCConfig.QuantumResistance)
 		}
 	}
-	
+
 	return sshConfig, nil
 }
 
@@ -151,10 +151,10 @@ func createSSHConfig(config SSHConnectionConfig) (*ssh.ClientConfig, error) {
 // multiple files, providing a standardized way to connect to SSH hosts via Tailscale.
 //
 // The connection process includes:
-//   1. Creating SSH client configuration
-//   2. Establishing TCP connection via tsnet
-//   3. Performing SSH handshake
-//   4. Returning ready-to-use SSH client
+//  1. Creating SSH client configuration
+//  2. Establishing TCP connection via tsnet
+//  3. Performing SSH handshake
+//  4. Returning ready-to-use SSH client
 //
 // Returns an active ssh.Client that must be closed by the caller.
 func EstablishSSHConnection(srv *tsnet.Server, ctx context.Context, config SSHConnectionConfig) (*ssh.Client, error) {
@@ -166,7 +166,7 @@ func EstablishSSHConnection(srv *tsnet.Server, ctx context.Context, config SSHCo
 
 	// Create connection address
 	sshTargetAddr := net.JoinHostPort(config.TargetHost, config.TargetPort)
-	
+
 	if config.Logger != nil {
 		config.Logger.Printf("%s", T("dial_via_tsnet"))
 	}
@@ -185,7 +185,7 @@ func EstablishSSHConnection(srv *tsnet.Server, ctx context.Context, config SSHCo
 	}
 
 	client := ssh.NewClient(sshConn, chans, reqs)
-	
+
 	if config.Logger != nil {
 		config.Logger.Printf("%s", T("ssh_connection_established"))
 	}

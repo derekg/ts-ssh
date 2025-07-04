@@ -20,11 +20,11 @@ func validateTTYOwnership(info os.FileInfo, ttyPath string) error {
 
 	currentUID := uint32(os.Getuid())
 	currentGID := uint32(os.Getgid())
-	
+
 	// Check ownership - TTY should be owned by current user OR root (for system terminals)
 	// Also allow if owned by current user's group (common in some environments)
 	if stat.Uid != currentUID && stat.Uid != 0 && stat.Gid != currentGID {
-		return fmt.Errorf("TTY not owned by current user, root, or current group (owned by UID %d, GID %d, current UID %d, GID %d)", 
+		return fmt.Errorf("TTY not owned by current user, root, or current group (owned by UID %d, GID %d, current UID %d, GID %d)",
 			stat.Uid, stat.Gid, currentUID, currentGID)
 	}
 
@@ -39,7 +39,7 @@ func validateTTYPermissions(info os.FileInfo, ttyPath string) error {
 	}
 
 	mode := info.Mode()
-	
+
 	// For /dev/tty specifically, permissions are often 666 and that's normal
 	// since it's a special device that redirects to the controlling terminal
 	if ttyPath == "/dev/tty" {
@@ -47,7 +47,7 @@ func validateTTYPermissions(info os.FileInfo, ttyPath string) error {
 		// it only gives access to the process's own controlling terminal
 		return nil
 	}
-	
+
 	// For actual TTY devices (like /dev/pts/0), be more careful about permissions
 	// but still allow common patterns for root-owned TTYs
 	if stat.Uid == 0 {
@@ -57,7 +57,7 @@ func validateTTYPermissions(info os.FileInfo, ttyPath string) error {
 		}
 		return nil
 	}
-	
+
 	// For user-owned TTYs, be strict about permissions
 	if mode&0077 != 0 {
 		return fmt.Errorf("TTY has unsafe permissions: %v (allows group/other access on user-owned TTY)", mode)
@@ -75,10 +75,10 @@ func validateOpenTTYOwnership(info os.FileInfo) error {
 
 	currentUID := uint32(os.Getuid())
 	currentGID := uint32(os.Getgid())
-	
+
 	// Use same relaxed ownership logic as validateTTYOwnership
 	if stat.Uid != currentUID && stat.Uid != 0 && stat.Gid != currentGID {
-		return fmt.Errorf("opened TTY ownership changed (owned by UID %d, GID %d, current UID %d, GID %d)", 
+		return fmt.Errorf("opened TTY ownership changed (owned by UID %d, GID %d, current UID %d, GID %d)",
 			stat.Uid, stat.Gid, currentUID, currentGID)
 	}
 

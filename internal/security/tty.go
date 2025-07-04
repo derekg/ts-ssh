@@ -13,11 +13,11 @@ import (
 func T(key string, args ...interface{}) string {
 	// Basic English translations for now
 	translations := map[string]string{
-		"tty_path_validation_failed": "TTY path validation failed",
-		"tty_ownership_check_failed": "TTY ownership check failed",
+		"tty_path_validation_failed":  "TTY path validation failed",
+		"tty_ownership_check_failed":  "TTY ownership check failed",
 		"tty_permission_check_failed": "TTY permission check failed",
 	}
-	
+
 	if msg, ok := translations[key]; ok {
 		if len(args) > 0 {
 			return fmt.Sprintf(msg, args...)

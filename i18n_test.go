@@ -20,7 +20,7 @@ func TestTranslationFunction(t *testing.T) {
 	initI18n("en")
 
 	tests := []struct {
-		key      string
+		key         string
 		expectEmpty bool
 	}{
 		{"flag_lang_desc", false},
@@ -33,11 +33,11 @@ func TestTranslationFunction(t *testing.T) {
 		t.Run(tt.key, func(t *testing.T) {
 			result := T(tt.key)
 			isEmpty := result == "" || result == tt.key
-			
+
 			if tt.expectEmpty && !isEmpty {
 				t.Errorf("T(%q) should return empty or key for nonexistent key, got %q", tt.key, result)
 			}
-			
+
 			if !tt.expectEmpty && isEmpty {
 				t.Errorf("T(%q) should return translation, got %q", tt.key, result)
 			}
@@ -63,12 +63,12 @@ func TestTranslationWithArgs(t *testing.T) {
 func TestI18nConcurrentAccess(t *testing.T) {
 	// This tests the race condition fix in i18n
 	done := make(chan bool, 20)
-	
+
 	// Start multiple goroutines that access i18n functions concurrently
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer func() { done <- true }()
-			
+
 			for j := 0; j < 100; j++ {
 				initI18n("en")
 				T("flag_lang_desc")
@@ -79,7 +79,7 @@ func TestI18nConcurrentAccess(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer func() { done <- true }()
-			
+
 			for j := 0; j < 100; j++ {
 				initI18n("es")
 				T("no_peers_found")
@@ -111,7 +111,7 @@ func TestI18nLanguageSwitching(t *testing.T) {
 	if englishResult == "" {
 		t.Error("English translation should not be empty")
 	}
-	
+
 	if spanishResult == "" {
 		t.Error("Spanish translation should not be empty")
 	}
@@ -128,7 +128,7 @@ func TestI18nThreadSafety(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(routineID int) {
 			defer wg.Done()
-			
+
 			for j := 0; j < numOperations; j++ {
 				// Mix of operations to stress test the race condition fixes
 				if j%3 == 0 {
@@ -136,7 +136,7 @@ func TestI18nThreadSafety(t *testing.T) {
 				} else if j%3 == 1 {
 					initI18n("es")
 				}
-				
+
 				// Use different translation keys
 				keys := []string{"flag_lang_desc", "no_peers_found", "status_online", "status_offline"}
 				key := keys[j%len(keys)]
@@ -163,8 +163,8 @@ func TestI18nThreadSafety(t *testing.T) {
 func TestI18nNewLanguages(t *testing.T) {
 	// Test new language support
 	testCases := []struct {
-		lang string
-		key  string
+		lang        string
+		key         string
 		shouldExist bool
 	}{
 		{"zh", "no_peers_found", true},
@@ -185,7 +185,7 @@ func TestI18nNewLanguages(t *testing.T) {
 		t.Run(tc.lang+"_"+tc.key, func(t *testing.T) {
 			initI18n(tc.lang)
 			result := T(tc.key)
-			
+
 			if tc.shouldExist {
 				if result == tc.key {
 					t.Errorf("Translation for key '%s' in language '%s' not found", tc.key, tc.lang)

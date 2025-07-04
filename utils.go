@@ -16,7 +16,7 @@ import (
 // and returns the host and port. If no port is specified, it uses defaultSSHPort.
 func parseTarget(target string, defaultPort string) (host, port string, err error) {
 	host = target
-	port = defaultPort 
+	port = defaultPort
 
 	if strings.HasPrefix(host, "[") {
 		endBracketIndex := strings.LastIndex(host, "]")
@@ -26,13 +26,13 @@ func parseTarget(target string, defaultPort string) (host, port string, err erro
 		if len(host) > endBracketIndex+1 && host[endBracketIndex+1] == ':' {
 			port = host[endBracketIndex+2:]
 			host = host[1:endBracketIndex]
-		} else if len(host) > endBracketIndex+1 { 
+		} else if len(host) > endBracketIndex+1 {
 			return "", "", fmt.Errorf("unexpected characters after ']' in IPv6 address: %s", host)
-		} else { 
+		} else {
 			host = host[1:endBracketIndex]
 		}
 	} else {
-		h, p, errSplit := net.SplitHostPort(target) 
+		h, p, errSplit := net.SplitHostPort(target)
 		if errSplit == nil {
 			host = h
 			port = p
@@ -46,10 +46,10 @@ func parseTarget(target string, defaultPort string) (host, port string, err erro
 	if host == "" {
 		return "", "", errors.New(T("hostname_cannot_be_empty"))
 	}
-	if port == "" { 
+	if port == "" {
 		port = defaultPort
 	}
-	
+
 	// SECURITY: Validate extracted components
 	// Handle case where host might contain user@hostname format
 	actualHost := host
@@ -64,15 +64,15 @@ func parseTarget(target string, defaultPort string) (host, port string, err erro
 			actualHost = parts[1]
 		}
 	}
-	
+
 	if err := security.ValidateHostname(actualHost); err != nil {
 		return "", "", fmt.Errorf("hostname validation failed: %w", err)
 	}
-	
+
 	if err := security.ValidatePort(port); err != nil {
 		return "", "", fmt.Errorf("port validation failed: %w", err)
 	}
-	
+
 	return host, port, nil
 }
 
@@ -82,7 +82,7 @@ func promptUserViaTTY(prompt string, logger *log.Logger) (string, error) {
 	result, err := security.PromptUserSecurely(prompt)
 	if err != nil {
 		logger.Printf("Warning: Could not use secure TTY for prompt: %v. Falling back to stdin.", err)
-		fmt.Fprint(os.Stderr, "(secure TTY unavailable, reading from stdin): ") 
+		fmt.Fprint(os.Stderr, "(secure TTY unavailable, reading from stdin): ")
 		reader := bufio.NewReader(os.Stdin)
 		line, errRead := reader.ReadString('\n')
 		if errRead != nil {

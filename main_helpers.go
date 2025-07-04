@@ -165,8 +165,8 @@ func handleVersionFlag(config *AppConfig) {
 
 // isPowerCLIMode determines if we're in power CLI mode (list, multi, exec, copy, pick)
 func isPowerCLIMode(config *AppConfig) bool {
-	return config.ListHosts || config.MultiHosts != "" || config.ExecCmd != "" || 
-		   config.CopyFiles != "" || config.PickHost
+	return config.ListHosts || config.MultiHosts != "" || config.ExecCmd != "" ||
+		config.CopyFiles != "" || config.PickHost
 }
 
 // handlePowerCLI handles all power CLI operations
@@ -189,27 +189,27 @@ func handlePowerCLI(config *AppConfig) error {
 	}
 
 	if config.MultiHosts != "" {
-		return handleMultiHosts(config.MultiHosts, config.Logger, config.SSHUser, 
-							   config.SSHKeyPath, config.InsecureHostKey)
+		return handleMultiHosts(config.MultiHosts, config.Logger, config.SSHUser,
+			config.SSHKeyPath, config.InsecureHostKey)
 	}
 
 	if config.ExecCmd != "" {
 		hosts := parseHostList(flag.Args())
-		return handleExecCommand(srv, ctx, config.ExecCmd, hosts, config.Logger, 
-								config.SSHUser, config.SSHKeyPath, config.InsecureHostKey, 
-								config.Parallel, config.Verbose)
+		return handleExecCommand(srv, ctx, config.ExecCmd, hosts, config.Logger,
+			config.SSHUser, config.SSHKeyPath, config.InsecureHostKey,
+			config.Parallel, config.Verbose)
 	}
 
 	if config.CopyFiles != "" {
-		return handleCopyFiles(srv, ctx, config.CopyFiles, config.Logger, 
-							  config.SSHUser, config.SSHKeyPath, config.InsecureHostKey, 
-							  config.Verbose)
+		return handleCopyFiles(srv, ctx, config.CopyFiles, config.Logger,
+			config.SSHUser, config.SSHKeyPath, config.InsecureHostKey,
+			config.Verbose)
 	}
 
 	if config.PickHost {
-		return handlePickHost(srv, ctx, status, config.Logger, config.SSHUser, 
-							 config.SSHKeyPath, config.InsecureHostKey, currentUser, 
-							 config.Verbose)
+		return handlePickHost(srv, ctx, status, config.Logger, config.SSHUser,
+			config.SSHKeyPath, config.InsecureHostKey, currentUser,
+			config.Verbose)
 	}
 
 	return nil
@@ -236,8 +236,8 @@ func handleSCPOperation(scpArgs *scpArgs, config *AppConfig) error {
 	}
 
 	err = scp.HandleCliScp(srv, ctx, config.Logger, scpArgs.sshUser, config.SSHKeyPath,
-					  config.InsecureHostKey, currentUser, scpArgs.localPath,
-					  scpArgs.remotePath, scpArgs.targetHost, true, config.Verbose)
+		config.InsecureHostKey, currentUser, scpArgs.localPath,
+		scpArgs.remotePath, scpArgs.targetHost, true, config.Verbose)
 
 	if err != nil {
 		return fmt.Errorf("%s", T("error_scp_failed"))
@@ -253,7 +253,7 @@ func handleSSHOperation(config *AppConfig) error {
 	if config.Target == "" {
 		return fmt.Errorf("target hostname required")
 	}
-	
+
 	targetHost, targetPort, err := parseTarget(config.Target, DefaultSshPort)
 	if err != nil {
 		return fmt.Errorf("%s", T("error_parsing_target"))
@@ -265,7 +265,7 @@ func handleSSHOperation(config *AppConfig) error {
 		parts := strings.SplitN(targetHost, "@", 2)
 		sshSpecificUser = parts[0]
 		targetHost = parts[1]
-		
+
 		// SECURITY: Validate extracted SSH user and hostname
 		if err := security.ValidateSSHUser(sshSpecificUser); err != nil {
 			return fmt.Errorf("SSH user validation failed: %w", err)
@@ -274,7 +274,7 @@ func handleSSHOperation(config *AppConfig) error {
 			return fmt.Errorf("extracted hostname validation failed: %w", err)
 		}
 	}
-	
+
 	// SECURITY: Validate all components
 	if err := security.ValidateSSHUser(sshSpecificUser); err != nil {
 		return fmt.Errorf("SSH user validation failed: %w", err)
@@ -312,7 +312,7 @@ func handleSSHOperation(config *AppConfig) error {
 			config.Logger.Printf("PQC: Enabled with resistance level %d", config.PQCLevel)
 		}
 	}
-	
+
 	// Establish SSH connection
 	sshConfig := sshclient.SSHConnectionConfig{
 		User:            sshSpecificUser,
@@ -347,12 +347,12 @@ func handleProxyCommand(srv *tsnet.Server, ctx context.Context, forwardDest stri
 	if err != nil {
 		return fmt.Errorf("failed to dial %s via tsnet for forwarding: %w", forwardDest, err)
 	}
-	
+
 	go func() {
 		_, _ = io.Copy(fwdConn, os.Stdin)
 		fwdConn.Close()
 	}()
-	
+
 	_, _ = io.Copy(os.Stdout, fwdConn)
 	return nil
 }
@@ -431,24 +431,24 @@ func setupTerminal(session *ssh.Session, fd int, logger *log.Logger) error {
 		termWidth = DefaultTerminalWidth
 		termHeight = DefaultTerminalHeight
 	}
-	
+
 	termType := os.Getenv("TERM")
 	if termType == "" {
 		termType = DefaultTerminalType
 	}
-	
+
 	err = session.RequestPty(termType, termHeight, termWidth, ssh.TerminalModes{})
 	if err != nil {
 		return fmt.Errorf("failed to request pseudo-terminal: %w", err)
 	}
-	
+
 	return nil
 }
 
 // handleInteractiveSession manages the interactive SSH session with proper terminal handling
 func handleInteractiveSession(session *ssh.Session, stdinPipe io.WriteCloser, fd int, logger *log.Logger) error {
 	termState := GetGlobalTerminalState()
-	
+
 	// Set up terminal in raw mode if we're in a terminal
 	if term.IsTerminal(fd) {
 		err := termState.MakeRaw(fd)
@@ -463,30 +463,30 @@ func handleInteractiveSession(session *ssh.Session, stdinPipe io.WriteCloser, fd
 			}()
 		}
 	}
-	
+
 	// Set up signal handling for graceful shutdown
 	done := make(chan bool, 1)
 	go handleInputWithTerminalState(stdinPipe, done, logger, termState)
-	
+
 	// Handle window resize signals if in terminal
 	if term.IsTerminal(fd) {
 		go handleSignalsAndResizeWithTerminalState(session, termState, logger)
 	}
-	
+
 	// Wait for session to complete
 	err := session.Wait()
 	done <- true // Signal input handler to stop
-	
+
 	return err
 }
 
 // handleInputWithTerminalState handles stdin input with terminal state awareness
 func handleInputWithTerminalState(stdinPipe io.WriteCloser, done chan bool, logger *log.Logger, termState *TerminalStateManager) {
 	defer stdinPipe.Close()
-	
+
 	// Create a buffered reader for stdin
 	input := make([]byte, 1024)
-	
+
 	for {
 		select {
 		case <-done:
@@ -499,7 +499,7 @@ func handleInputWithTerminalState(stdinPipe io.WriteCloser, done chan bool, logg
 				}
 				return
 			}
-			
+
 			// Write to SSH session
 			_, writeErr := stdinPipe.Write(input[:n])
 			if writeErr != nil {
@@ -509,4 +509,3 @@ func handleInputWithTerminalState(stdinPipe io.WriteCloser, done chan bool, logg
 		}
 	}
 }
-

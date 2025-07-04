@@ -183,3 +183,74 @@ go vet ./...
 - **Security modules**: 100% coverage required
 - **Core functionality**: 70%+ coverage minimum
 - **Configuration**: Comprehensive constant validation required
+
+## Architecture Insights
+
+### Tailscale Integration (`tsnet` Library)
+- **Authentication URL Display**: `tsnet.Server.UserLogf` controls where authentication URLs are shown
+- **Key Discovery**: `UserLogf` outputs to stderr by default, but can be redirected to io.Discard in non-verbose mode
+- **Critical Pattern**: Always use a dedicated stderr logger for UserLogf to ensure auth URLs are visible:
+  ```go
+  stderrLogger := log.New(os.Stderr, "", 0)
+  srv.UserLogf = stderrLogger.Printf
+  ```
+- **Logger Configuration**: `srv.Logf` vs `srv.UserLogf` serve different purposes - Logf for debug info, UserLogf for user-facing messages
+
+### Internationalization System
+- **Translation Coverage**: Currently supports 11 languages (en, es, zh, hi, ar, bn, pt, ru, ja, de, fr)
+- **Missing Translation Detection**: Use `rg "T\(\"[^\"]*\"\)" -o -h --no-filename | sort | uniq` to find all translation keys
+- **Translation Validation**: Check for missing translations by running app with different LANG settings
+- **Key Patterns**: Connection status messages like "Starting Tailscale connection..." need translation coverage
+- **Format String Safety**: Use `fmt.Errorf("%s", T("key"))` instead of `fmt.Errorf(T("key"))` to avoid go vet warnings
+
+### CLI Framework (Cobra/Fang)
+- **Text Rendering Issue**: Cobra/Fang may strip spaces from Example fields in help text
+- **Workaround Patterns**: Use non-breaking spaces or alternative formatting for help examples
+- **Translation Integration**: Example text should be translated and may need language-specific formatting
+
+### Code Organization Best Practices
+- **Function Extraction**: Break large functions into smaller, focused helpers (e.g., `initTsNet()` refactored into multiple helper functions)
+- **Error Handling**: Use consistent error wrapping patterns with translated messages
+- **Logger Management**: Distinguish between verbose debug logging and user-facing messages
+- **Terminal State**: Centralize terminal state management for consistent behavior across interactive sessions
+
+## Debugging Workflows
+
+### Authentication Issues
+1. Check if auth URL appears in verbose mode: `./ts-ssh connect -v target`
+2. Verify UserLogf configuration in tsnet_handler.go
+3. Test logger output destination (should be stderr, not io.Discard)
+
+### Missing Translations
+1. Extract all translation keys: `rg "T\(\"[^\"]*\"\)" -o -h --no-filename | sort | uniq`
+2. Test different languages: `LANG=es ./ts-ssh --help`
+3. Look for untranslated strings in output (they appear as key names)
+
+### CLI Rendering Issues
+1. Check help output formatting: `./ts-ssh --help`
+2. Verify example text spacing in different languages
+3. Test both modern and legacy CLI modes
+
+## Development Workflow
+
+### Before Committing
+```bash
+# Format and validate code
+go fmt ./...
+go vet ./...
+
+# Run comprehensive tests
+go test ./...
+
+# Check for translation issues
+for lang in es zh hi ar bn pt ru ja de fr; do
+    echo "Testing $lang..."
+    LANG=$lang ./ts-ssh --help | head -10
+done
+```
+
+### Code Quality Checks
+- Run `go vet ./...` to catch format string issues
+- Use `golangci-lint run` for comprehensive linting
+- Test auth URL display in both verbose and non-verbose modes
+- Validate translation coverage for new user-facing messages

@@ -62,7 +62,7 @@ func handleListHosts(status *ipnstate.Status, verbose bool) error {
 		// Get individual labels for the header
 		labels := strings.Split(T("host_list_labels"), ",")
 		separators := strings.Split(T("host_list_separator"), ",")
-		
+
 		// Default fallback if translation fails
 		if len(labels) < 4 {
 			labels = []string{"HOST", "IP", "STATUS", "OS"}
@@ -70,10 +70,10 @@ func handleListHosts(status *ipnstate.Status, verbose bool) error {
 		if len(separators) < 4 {
 			separators = []string{"----", "--", "------", "--"}
 		}
-		
+
 		fmt.Printf("%-25s %-15s %-8s %s\n", labels[0], labels[1], labels[2], labels[3])
 		fmt.Printf("%-25s %-15s %-8s %s\n", separators[0], separators[1], separators[2], separators[3])
-		
+
 		for _, host := range hosts {
 			status := T("status_offline")
 			if host.online {
@@ -96,7 +96,7 @@ func handleListHosts(status *ipnstate.Status, verbose bool) error {
 // handlePickHost provides simple interactive host selection
 func handlePickHost(srv *tsnet.Server, ctx context.Context, status *ipnstate.Status, logger *log.Logger,
 	sshUser, sshKeyPath string, insecureHostKey bool, currentUser *user.User, verbose bool) error {
-	
+
 	if status == nil || len(status.Peer) == 0 {
 		return fmt.Errorf("%s", T("no_peers_found"))
 	}
@@ -161,17 +161,17 @@ func handleMultiHosts(multiHosts string, logger *log.Logger, sshUser, sshKeyPath
 	}
 
 	tmuxManager := NewTmuxManager(logger, sshUser, sshKeyPath, insecureHostKey)
-	
+
 	// Ensure cleanup happens on exit
 	defer tmuxManager.cleanupTempConfigFiles()
-	
+
 	return tmuxManager.StartMultiSession(hosts)
 }
 
 // handleExecCommand executes a command on multiple hosts
 func handleExecCommand(srv *tsnet.Server, ctx context.Context, execCmd string, hosts []string,
 	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, parallel, verbose bool) error {
-	
+
 	if len(hosts) == 0 {
 		return fmt.Errorf("%s", T("no_hosts_for_exec"))
 	}
@@ -186,7 +186,7 @@ func handleExecCommand(srv *tsnet.Server, ctx context.Context, execCmd string, h
 // handleCopyFiles copies files to multiple hosts
 func handleCopyFiles(srv *tsnet.Server, ctx context.Context, copyFiles string, logger *log.Logger,
 	sshUser, sshKeyPath string, insecureHostKey bool, verbose bool) error {
-	
+
 	// Parse format: localfile host1,host2:/path/
 	parts := strings.Split(copyFiles, " ")
 	if len(parts) != 2 {
@@ -213,16 +213,16 @@ func handleCopyFiles(srv *tsnet.Server, ctx context.Context, copyFiles string, l
 	// Copy to each host sequentially
 	for _, host := range hosts {
 		fmt.Println(T("copying_to", localFile, host, remotePath))
-		
+
 		// Use our existing SCP logic
 		err := scp.HandleCliScp(srv, ctx, logger, sshUser, sshKeyPath, insecureHostKey, nil,
 			localFile, remotePath, host, true, verbose)
-		
+
 		if err != nil {
 			fmt.Println(T("copy_failed", host, err))
 			continue
 		}
-		
+
 		if verbose {
 			fmt.Println(T("copy_success", host))
 		}
@@ -234,10 +234,10 @@ func handleCopyFiles(srv *tsnet.Server, ctx context.Context, copyFiles string, l
 // executeParallel runs commands on multiple hosts in parallel with race condition protection
 func executeParallel(srv *tsnet.Server, ctx context.Context, execCmd string, hosts []string,
 	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, verbose bool) error {
-	
+
 	var wg sync.WaitGroup
 	results := make(chan string, len(hosts))
-	
+
 	// Create a mutex to protect against concurrent password prompts
 	var authMutex sync.Mutex
 
@@ -245,10 +245,10 @@ func executeParallel(srv *tsnet.Server, ctx context.Context, execCmd string, hos
 		wg.Add(1)
 		go func(h string) {
 			defer wg.Done()
-			
+
 			// Create a host-specific logger to avoid concurrent access to shared logger
 			hostLogger := log.New(logger.Writer(), fmt.Sprintf("[%s] ", h), logger.Flags())
-			
+
 			output, err := executeOnHostSafe(srv, ctx, execCmd, h, hostLogger, sshUser, sshKeyPath, insecureHostKey, verbose, &authMutex)
 			if err != nil {
 				results <- fmt.Sprintf("[%s] ERROR: %v", h, err)
@@ -275,16 +275,16 @@ func executeParallel(srv *tsnet.Server, ctx context.Context, execCmd string, hos
 // executeSequential runs commands on hosts one by one
 func executeSequential(srv *tsnet.Server, ctx context.Context, execCmd string, hosts []string,
 	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, verbose bool) error {
-	
+
 	for _, host := range hosts {
 		fmt.Printf("=== %s ===\n", host)
-		
+
 		output, err := executeOnHost(srv, ctx, execCmd, host, logger, sshUser, sshKeyPath, insecureHostKey, verbose)
 		if err != nil {
 			fmt.Printf("ERROR: %v\n", err)
 			continue
 		}
-		
+
 		fmt.Printf("%s\n", output)
 	}
 
@@ -294,16 +294,16 @@ func executeSequential(srv *tsnet.Server, ctx context.Context, execCmd string, h
 // executeCommandOnHost executes a command on a remote host using SSH helpers
 func executeCommandOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host string,
 	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, authMutex *sync.Mutex) (string, error) {
-	
+
 	// SECURITY: Validate command and hostname to prevent injection attacks
 	if err := security.ValidateCommand(execCmd); err != nil {
 		return "", fmt.Errorf("command validation failed: %w", err)
 	}
-	
+
 	if err := security.ValidateHostname(host); err != nil {
 		return "", fmt.Errorf("hostname validation failed: %w", err)
 	}
-	
+
 	// Parse target and user
 	targetHost, targetPort, err := parseTarget(host, DefaultSshPort)
 	if err != nil {
@@ -315,23 +315,23 @@ func executeCommandOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host 
 		parts := strings.SplitN(targetHost, "@", 2)
 		effectiveUser = parts[0]
 		targetHost = parts[1]
-		
+
 		// SECURITY: Validate extracted SSH user
 		if err := security.ValidateSSHUser(effectiveUser); err != nil {
 			return "", fmt.Errorf("SSH user validation failed: %w", err)
 		}
-		
+
 		// SECURITY: Re-validate hostname after extraction
 		if err := security.ValidateHostname(targetHost); err != nil {
 			return "", fmt.Errorf("extracted hostname validation failed: %w", err)
 		}
 	}
-	
+
 	// SECURITY: Validate SSH user in all cases
 	if err := security.ValidateSSHUser(effectiveUser); err != nil {
 		return "", fmt.Errorf("SSH user validation failed: %w", err)
 	}
-	
+
 	// SECURITY: Validate port
 	if err := security.ValidatePort(targetPort); err != nil {
 		return "", fmt.Errorf("port validation failed: %w", err)
@@ -355,7 +355,7 @@ func executeCommandOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host 
 		if err != nil {
 			return "", fmt.Errorf("failed to create auth methods: %w", err)
 		}
-		
+
 		// Create client config manually for custom auth
 		clientConfig := &ssh.ClientConfig{
 			User:            effectiveUser,
@@ -363,7 +363,7 @@ func executeCommandOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host 
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // Simplified for parallel execution
 			Timeout:         DefaultSSHTimeout,
 		}
-		
+
 		return executeSSHCommandWithConfig(srv, ctx, clientConfig, targetHost, targetPort, execCmd)
 	}
 
@@ -393,7 +393,7 @@ func createSSHAuthMethodsWithMutex(keyPath, user, targetHost string, logger *log
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
 		authMutex.Lock()
 		defer authMutex.Unlock()
-		
+
 		fmt.Print(T("enter_password", user, targetHost))
 		password, err := security.ReadPasswordSecurely()
 		fmt.Println()
@@ -425,7 +425,7 @@ func executeSSHCommand(client *ssh.Client, execCmd string) (string, error) {
 // executeSSHCommandWithConfig runs a command using low-level SSH connection
 func executeSSHCommandWithConfig(srv *tsnet.Server, ctx context.Context, sshConfig *ssh.ClientConfig, targetHost, targetPort, execCmd string) (string, error) {
 	sshTargetAddr := net.JoinHostPort(targetHost, targetPort)
-	
+
 	conn, err := srv.Dial(ctx, "tcp", sshTargetAddr)
 	if err != nil {
 		return "", fmt.Errorf("failed to dial %s via tsnet: %w", sshTargetAddr, err)
@@ -447,14 +447,14 @@ func executeSSHCommandWithConfig(srv *tsnet.Server, ctx context.Context, sshConf
 // executeOnHost executes a command on a single host and returns the output
 func executeOnHost(srv *tsnet.Server, ctx context.Context, execCmd, host string,
 	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, verbose bool) (string, error) {
-	
+
 	return executeCommandOnHost(srv, ctx, execCmd, host, logger, sshUser, sshKeyPath, insecureHostKey, nil)
 }
 
 // executeOnHostSafe executes a command on a single host with thread-safe authentication
 func executeOnHostSafe(srv *tsnet.Server, ctx context.Context, execCmd, host string,
 	logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool, verbose bool, authMutex *sync.Mutex) (string, error) {
-	
+
 	return executeCommandOnHost(srv, ctx, execCmd, host, logger, sshUser, sshKeyPath, insecureHostKey, authMutex)
 }
 

@@ -51,7 +51,7 @@ func TestSSHKeyDiscovery(t *testing.T) {
 			t.Fatalf("Failed to create RSA key file: %v", err)
 		}
 
-		// Create Ed25519 key file  
+		// Create Ed25519 key file
 		if err := os.WriteFile(ed25519Path, []byte("fake-ed25519-key"), 0600); err != nil {
 			t.Fatalf("Failed to create Ed25519 key file: %v", err)
 		}
@@ -97,9 +97,9 @@ func TestSSHKeyDiscovery(t *testing.T) {
 	t.Run("key_type_preference_order", func(t *testing.T) {
 		// Create all supported key types
 		keyFiles := map[string]string{
-			"id_rsa":      "fake-rsa-key",
-			"id_ecdsa":    "fake-ecdsa-key", 
-			"id_ed25519":  "fake-ed25519-key",
+			"id_rsa":     "fake-rsa-key",
+			"id_ecdsa":   "fake-ecdsa-key",
+			"id_ed25519": "fake-ed25519-key",
 		}
 
 		// Create all key files
@@ -143,9 +143,9 @@ func TestSSHKeyDiscovery(t *testing.T) {
 // TestModernKeyTypes verifies our key type preferences are correctly ordered
 func TestModernKeyTypes(t *testing.T) {
 	expected := []string{
-		"id_ed25519",  // Most secure and modern
-		"id_ecdsa",    // Good performance and security
-		"id_rsa",      // Legacy but still supported
+		"id_ed25519", // Most secure and modern
+		"id_ecdsa",   // Good performance and security
+		"id_rsa",     // Legacy but still supported
 	}
 
 	if len(ModernKeyTypes) != len(expected) {
@@ -171,7 +171,7 @@ func TestKeyDiscoveryDocumentation(t *testing.T) {
 		// When no keys exist, should recommend Ed25519
 		defaultPath := GetDefaultSSHKeyPath(&user.User{HomeDir: tempHome}, nil)
 		expectedPath := filepath.Join(tempHome, ".ssh", "id_ed25519")
-		
+
 		if defaultPath != expectedPath {
 			t.Errorf("Expected recommendation for Ed25519 path %s, got %s", expectedPath, defaultPath)
 		}
@@ -198,7 +198,7 @@ func TestLegacyCompatibility(t *testing.T) {
 	}
 
 	logger := log.New(io.Discard, "", 0)
-	
+
 	// Should still find and use the RSA key
 	result := discoverSSHKey(tempHome, logger)
 	if result != rsaPath {

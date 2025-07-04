@@ -22,7 +22,7 @@ type InputValidator struct {
 // Security constants for input validation
 const (
 	MaxHostnameLength = 253  // RFC 1035 limit
-	MaxPathLength     = 4096 // Common filesystem limit  
+	MaxPathLength     = 4096 // Common filesystem limit
 	MaxCommandLength  = 8192 // Reasonable command length limit
 	MaxPortNumber     = 65535
 	MinPortNumber     = 1
@@ -116,7 +116,7 @@ func (iv *InputValidator) ValidateFilePath(path string) error {
 	if strings.Contains(path, "..") {
 		return fmt.Errorf("path traversal attempt detected: %s", path)
 	}
-	
+
 	// Clean the path and check if it changed significantly (another traversal check)
 	cleanPath := filepath.Clean(path)
 	if cleanPath != path && strings.Contains(path, "/") {
@@ -245,18 +245,18 @@ func (iv *InputValidator) ValidateWindowName(windowName string) error {
 	if windowName == "" {
 		return fmt.Errorf("window name cannot be empty")
 	}
-	
+
 	if len(windowName) > 64 {
 		return fmt.Errorf("window name too long: %d characters (max 64)", len(windowName))
 	}
-	
+
 	// Window names should be safe for tmux and shell usage
 	// Allow alphanumeric, hyphens, underscores, and basic safe characters
 	validWindowRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 	if !validWindowRegex.MatchString(windowName) {
 		return fmt.Errorf("window name contains invalid characters (only alphanumeric, hyphen, underscore allowed)")
 	}
-	
+
 	return nil
 }
 
@@ -330,17 +330,17 @@ func ValidateWindowName(windowName string) error {
 	if windowName == "" {
 		return fmt.Errorf("window name cannot be empty")
 	}
-	
+
 	if len(windowName) > 64 {
 		return fmt.Errorf("window name too long: %d characters (max 64)", len(windowName))
 	}
-	
+
 	// Window names should be safe for tmux and shell usage
 	// Allow alphanumeric, hyphens, underscores, and basic safe characters
 	validWindowRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 	if !validWindowRegex.MatchString(windowName) {
 		return fmt.Errorf("window name contains invalid characters (only alphanumeric, hyphen, underscore allowed)")
 	}
-	
+
 	return nil
 }

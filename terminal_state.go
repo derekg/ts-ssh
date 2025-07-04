@@ -25,16 +25,16 @@ func NewTerminalStateManager() *TerminalStateManager {
 func (tsm *TerminalStateManager) MakeRaw(fd int) error {
 	tsm.mu.Lock()
 	defer tsm.mu.Unlock()
-	
+
 	if tsm.isRaw {
 		return nil // Already in raw mode
 	}
-	
+
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
 		return err
 	}
-	
+
 	tsm.oldState = oldState
 	tsm.fd = fd
 	tsm.isRaw = true
@@ -45,11 +45,11 @@ func (tsm *TerminalStateManager) MakeRaw(fd int) error {
 func (tsm *TerminalStateManager) Restore() error {
 	tsm.mu.Lock()
 	defer tsm.mu.Unlock()
-	
+
 	if !tsm.isRaw || tsm.oldState == nil {
 		return nil // Nothing to restore
 	}
-	
+
 	err := term.Restore(tsm.fd, tsm.oldState)
 	if err == nil {
 		tsm.isRaw = false

@@ -285,10 +285,10 @@ func TestStandaloneSSHKeyFormats(t *testing.T) {
 
 		// Test different PEM formats
 		formats := []struct {
-			name      string
-			pemType   string
-			marshal   func(*rsa.PrivateKey) []byte
-			parse     func([]byte) (*rsa.PrivateKey, error)
+			name    string
+			pemType string
+			marshal func(*rsa.PrivateKey) []byte
+			parse   func([]byte) (*rsa.PrivateKey, error)
 		}{
 			{
 				name:    "PKCS1",

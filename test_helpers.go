@@ -19,7 +19,7 @@ func createVerboseTestLogger() *log.Logger {
 
 // isTestEnvironment checks if we're running in a test environment
 func isTestEnvironment() bool {
-	return os.Getenv("GO_TEST") != "" || 
-		   os.Getenv("TESTING") != "" ||
-		   len(os.Args) > 0 && os.Args[0] == "go"
+	return os.Getenv("GO_TEST") != "" ||
+		os.Getenv("TESTING") != "" ||
+		len(os.Args) > 0 && os.Args[0] == "go"
 }

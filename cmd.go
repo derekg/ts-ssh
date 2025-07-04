@@ -12,40 +12,40 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
-	
+
 	"github.com/derekg/ts-ssh/internal/crypto/pqc"
 )
 
 // Style definitions using lipgloss
 var (
 	// Theme colors
-	primaryColor   = lipgloss.Color("#04B575")
-	errorColor     = lipgloss.Color("#FF4B4B")
-	warningColor   = lipgloss.Color("#FFA500")
-	infoColor      = lipgloss.Color("#3B82F6")
-	
+	primaryColor = lipgloss.Color("#04B575")
+	errorColor   = lipgloss.Color("#FF4B4B")
+	warningColor = lipgloss.Color("#FFA500")
+	infoColor    = lipgloss.Color("#3B82F6")
+
 	// Styles
 	titleStyle = lipgloss.NewStyle().
-		Foreground(primaryColor).
-		Bold(true)
-	
+			Foreground(primaryColor).
+			Bold(true)
+
 	successStyle = lipgloss.NewStyle().
-		Foreground(primaryColor)
-		
+			Foreground(primaryColor)
+
 	errorStyle = lipgloss.NewStyle().
-		Foreground(errorColor).
-		Bold(true)
-		
+			Foreground(errorColor).
+			Bold(true)
+
 	warningStyle = lipgloss.NewStyle().
-		Foreground(warningColor)
-		
+			Foreground(warningColor)
+
 	infoStyle = lipgloss.NewStyle().
-		Foreground(infoColor)
-		
+			Foreground(infoColor)
+
 	headerStyle = lipgloss.NewStyle().
-		Foreground(primaryColor).
-		Bold(true).
-		Underline(true)
+			Foreground(primaryColor).
+			Bold(true).
+			Underline(true)
 )
 
 // NewRootCmd creates the root command with Cobra/Fang integration
@@ -54,12 +54,12 @@ func NewRootCmd() *cobra.Command {
 		EnablePQC: true,
 		PQCLevel:  1,
 	}
-	
+
 	rootCmd := &cobra.Command{
-		Use:   "ts-ssh [user@]hostname[:port] [command...]",
-		Short: T("root_short"),
-		Long:  titleStyle.Render("ts-ssh") + " - " + T("root_long"),
-		Example: T("root_examples"),
+		Use:          "ts-ssh [user@]hostname[:port] [command...]",
+		Short:        T("root_short"),
+		Long:         titleStyle.Render("ts-ssh") + " - " + T("root_long"),
+		Example:      T("root_examples"),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Default behavior: if args are provided and first arg is not a subcommand,
@@ -71,7 +71,7 @@ func NewRootCmd() *cobra.Command {
 			return cmd.Help()
 		},
 	}
-	
+
 	// Global flags
 	rootCmd.PersistentFlags().StringVarP(&config.SSHUser, "user", "u", "", T("flag_user_help"))
 	rootCmd.PersistentFlags().StringVarP(&config.SSHKeyPath, "identity", "i", "", T("flag_identity_help"))
@@ -84,7 +84,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().StringVar(&config.Language, "lang", "", T("flag_lang_help"))
 	rootCmd.PersistentFlags().BoolVar(&config.EnablePQC, "pqc", true, T("flag_pqc_help"))
 	rootCmd.PersistentFlags().IntVar(&config.PQCLevel, "pqc-level", 1, T("flag_pqc_level_help"))
-	
+
 	// Add subcommands
 	rootCmd.AddCommand(
 		newConnectCmd(config),
@@ -96,21 +96,21 @@ func NewRootCmd() *cobra.Command {
 		newPQCCmd(config),
 		newVersionCmd(config),
 	)
-	
+
 	return rootCmd
 }
 
 // newConnectCmd creates the connect subcommand
 func newConnectCmd(config *Config) *cobra.Command {
 	var forwardDest string
-	
+
 	cmd := &cobra.Command{
 		Use:     "connect [user@]hostname[:port] [command...]",
 		Aliases: []string{"ssh"},
 		Short:   T("connect_short"),
 		Long:    T("connect_long"),
 		Example: T("connect_examples"),
-		Args: cobra.MinimumNArgs(1),
+		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Create connect command with forward destination
 			connectCmd := &ConnectCommand{
@@ -126,9 +126,9 @@ func newConnectCmd(config *Config) *cobra.Command {
 			return connectCmd.Run(context.Background())
 		},
 	}
-	
+
 	cmd.Flags().StringVarP(&forwardDest, "forward", "W", "", "Forward stdin/stdout to specified destination")
-	
+
 	return cmd
 }
 
@@ -136,13 +136,13 @@ func newConnectCmd(config *Config) *cobra.Command {
 func newSCPCmd(config *Config) *cobra.Command {
 	var recursive bool
 	var preserve bool
-	
+
 	cmd := &cobra.Command{
-		Use:   "scp [-r] [-p] source destination",
-		Short: T("scp_short"),
-		Long:  T("scp_long"),
+		Use:     "scp [-r] [-p] source destination",
+		Short:   T("scp_short"),
+		Long:    T("scp_long"),
 		Example: T("scp_examples"),
-		Args: cobra.ExactArgs(2),
+		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			scpCmd := &SCPCommand{
 				Config:      config,
@@ -154,17 +154,17 @@ func newSCPCmd(config *Config) *cobra.Command {
 			return scpCmd.Run(context.Background())
 		},
 	}
-	
+
 	cmd.Flags().BoolVarP(&recursive, "recursive", "r", false, "Recursively copy directories")
 	cmd.Flags().BoolVarP(&preserve, "preserve", "p", false, "Preserve file attributes")
-	
+
 	return cmd
 }
 
 // newListCmd creates the list subcommand
 func newListCmd(config *Config) *cobra.Command {
 	var interactive bool
-	
+
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -179,9 +179,9 @@ func newListCmd(config *Config) *cobra.Command {
 			return listCmd.Run(context.Background())
 		},
 	}
-	
+
 	cmd.Flags().BoolVar(&interactive, "interactive", false, "Interactive host picker with styled UI")
-	
+
 	return cmd
 }
 
@@ -189,13 +189,13 @@ func newListCmd(config *Config) *cobra.Command {
 func newExecCmd(config *Config) *cobra.Command {
 	var command string
 	var parallel bool
-	
+
 	cmd := &cobra.Command{
-		Use:   "exec [hosts...] -c command",
-		Short: T("exec_short"),
-		Long:  T("exec_long"),
+		Use:     "exec [hosts...] -c command",
+		Short:   T("exec_short"),
+		Long:    T("exec_long"),
 		Example: T("exec_examples"),
-		Args: cobra.MinimumNArgs(1),
+		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			execCmd := &ExecCommand{
 				Config:   config,
@@ -206,11 +206,11 @@ func newExecCmd(config *Config) *cobra.Command {
 			return execCmd.Run(context.Background())
 		},
 	}
-	
+
 	cmd.Flags().StringVarP(&command, "command", "c", "", "Command to execute on hosts (required)")
 	cmd.MarkFlagRequired("command")
 	cmd.Flags().BoolVarP(&parallel, "parallel", "p", false, "Execute commands in parallel")
-	
+
 	return cmd
 }
 
@@ -219,11 +219,11 @@ func newMultiCmd(config *Config) *cobra.Command {
 	var hosts string
 	var sessions bool
 	var tmux bool
-	
+
 	cmd := &cobra.Command{
-		Use:   "multi",
-		Short: T("multi_short"),
-		Long:  T("multi_long"),
+		Use:     "multi",
+		Short:   T("multi_short"),
+		Long:    T("multi_long"),
 		Example: T("multi_examples"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			multiCmd := &MultiCommand{
@@ -235,11 +235,11 @@ func newMultiCmd(config *Config) *cobra.Command {
 			return multiCmd.Run(context.Background())
 		},
 	}
-	
+
 	cmd.Flags().StringVar(&hosts, "hosts", "", "Comma-separated list of hosts")
 	cmd.Flags().BoolVarP(&sessions, "sessions", "s", false, "Create multiple SSH sessions")
 	cmd.Flags().BoolVarP(&tmux, "tmux", "t", false, "Use tmux for session management")
-	
+
 	return cmd
 }
 
@@ -250,11 +250,11 @@ func newConfigCmd(config *Config) *cobra.Command {
 	var unset string
 	var reset bool
 	var global bool
-	
+
 	cmd := &cobra.Command{
-		Use:   "config",
-		Short: T("config_short"),
-		Long:  T("config_long"),
+		Use:     "config",
+		Short:   T("config_short"),
+		Long:    T("config_long"),
 		Example: T("config_examples"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configCmd := &ConfigCommand{
@@ -268,13 +268,13 @@ func newConfigCmd(config *Config) *cobra.Command {
 			return configCmd.Run(context.Background())
 		},
 	}
-	
+
 	cmd.Flags().BoolVar(&show, "show", false, "Show current configuration")
 	cmd.Flags().StringVar(&set, "set", "", "Set configuration value (key=value)")
 	cmd.Flags().StringVar(&unset, "unset", "", "Unset configuration value")
 	cmd.Flags().BoolVar(&reset, "reset", false, "Reset configuration to defaults")
 	cmd.Flags().BoolVarP(&global, "global", "g", false, "Apply to global configuration")
-	
+
 	return cmd
 }
 
@@ -284,11 +284,11 @@ func newPQCCmd(config *Config) *cobra.Command {
 	var test bool
 	var benchmark bool
 	var showSupported bool
-	
+
 	cmd := &cobra.Command{
-		Use:   "pqc",
-		Short: T("pqc_short"),
-		Long:  T("pqc_long"),
+		Use:     "pqc",
+		Short:   T("pqc_short"),
+		Long:    T("pqc_long"),
 		Example: T("pqc_examples"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			pqcCmd := &PQCCommand{
@@ -301,12 +301,12 @@ func newPQCCmd(config *Config) *cobra.Command {
 			return pqcCmd.Run(context.Background())
 		},
 	}
-	
+
 	cmd.Flags().BoolVarP(&report, "report", "r", false, "Generate PQC usage report")
 	cmd.Flags().BoolVarP(&test, "test", "t", false, "Test PQC functionality")
 	cmd.Flags().BoolVarP(&benchmark, "benchmark", "b", false, "Run PQC performance benchmarks")
 	cmd.Flags().BoolVarP(&showSupported, "supported", "s", false, "Show supported PQC algorithms")
-	
+
 	return cmd
 }
 
@@ -314,7 +314,7 @@ func newPQCCmd(config *Config) *cobra.Command {
 func newVersionCmd(config *Config) *cobra.Command {
 	var short bool
 	var commit bool
-	
+
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: T("version_short"),
@@ -328,10 +328,10 @@ func newVersionCmd(config *Config) *cobra.Command {
 			return versionCmd.Run(context.Background())
 		},
 	}
-	
+
 	cmd.Flags().BoolVarP(&short, "short", "s", false, "Show short version only")
 	cmd.Flags().BoolVarP(&commit, "commit", "c", false, "Include commit information")
-	
+
 	return cmd
 }
 
@@ -339,27 +339,27 @@ func newVersionCmd(config *Config) *cobra.Command {
 func runConnect(config *Config, args []string) error {
 	// Parse target and command
 	if len(args) == 0 {
-		return fmt.Errorf("target hostname required")
+		return fmt.Errorf("%s", T("target_hostname_required"))
 	}
-	
+
 	target := args[0]
 	var command []string
 	if len(args) > 1 {
 		command = args[1:]
 	}
-	
+
 	// Create connect command
 	connectCmd := &ConnectCommand{
 		Config:  config,
 		Target:  target,
 		Command: command,
 	}
-	
+
 	// Show styled connection message
 	if config.Verbose {
 		fmt.Println(infoStyle.Render("🔐 Establishing secure connection to " + target + "..."))
 	}
-	
+
 	// Run the connection
 	return connectCmd.Run(context.Background())
 }
@@ -370,7 +370,7 @@ func (c *ListCommand) RunInteractive(ctx context.Context, hosts []string) error 
 		fmt.Println(warningStyle.Render("⚠️  No hosts found on the Tailscale network"))
 		return nil
 	}
-	
+
 	// Create styled options
 	options := make([]huh.Option[string], len(hosts))
 	for i, host := range hosts {
@@ -378,9 +378,9 @@ func (c *ListCommand) RunInteractive(ctx context.Context, hosts []string) error 
 		displayName := fmt.Sprintf("🖥️  %s", host)
 		options[i] = huh.NewOption(displayName, host)
 	}
-	
+
 	var selectedHost string
-	
+
 	// Create the interactive form
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -391,20 +391,20 @@ func (c *ListCommand) RunInteractive(ctx context.Context, hosts []string) error 
 				Value(&selectedHost),
 		),
 	)
-	
+
 	// Run the form
 	if err := form.Run(); err != nil {
 		return err
 	}
-	
+
 	if selectedHost == "" {
-		return fmt.Errorf("no host selected")
+		return fmt.Errorf("%s", T("no_host_selected"))
 	}
-	
+
 	// Show connection message
 	fmt.Println(successStyle.Render("✓ Selected: " + selectedHost))
 	fmt.Println(infoStyle.Render("🔐 Establishing connection..."))
-	
+
 	// Create app config for SSH connection
 	appConfig := &AppConfig{
 		SSHUser:         c.SSHUser,
@@ -417,25 +417,25 @@ func (c *ListCommand) RunInteractive(ctx context.Context, hosts []string) error 
 		EnablePQC:       c.EnablePQC,
 		PQCLevel:        c.PQCLevel,
 	}
-	
+
 	// Set up logger
 	if c.Verbose {
 		appConfig.Logger = logger
 	} else {
 		appConfig.Logger = log.New(io.Discard, "", 0)
 	}
-	
+
 	return handleSSHOperation(appConfig)
 }
 
 // ShowPQCReport displays a styled PQC report
 func (c *PQCCommand) ShowStyledReport(logger *log.Logger) error {
 	report := pqc.GenerateGlobalReport(logger)
-	
+
 	// Style the report header
 	fmt.Println(headerStyle.Render("🔐 Post-Quantum Cryptography Report"))
 	fmt.Println()
-	
+
 	// Parse and style the report sections
 	lines := strings.Split(report, "\n")
 	for _, line := range lines {
@@ -451,17 +451,17 @@ func (c *PQCCommand) ShowStyledReport(logger *log.Logger) error {
 			fmt.Println(line)
 		}
 	}
-	
+
 	// Check quantum readiness
 	ready, assessment := pqc.CheckGlobalQuantumReadiness(logger)
 	fmt.Println()
-	
+
 	if ready {
 		fmt.Println(successStyle.Render("✅ Quantum Readiness: " + assessment))
 	} else {
 		fmt.Println(warningStyle.Render("⚠️  Quantum Readiness: " + assessment))
 	}
-	
+
 	// Get recommendations
 	recommendations := pqc.GetGlobalRecommendations(logger)
 	if len(recommendations) > 0 {
@@ -471,7 +471,7 @@ func (c *PQCCommand) ShowStyledReport(logger *log.Logger) error {
 			fmt.Printf("  %s %s\n", infoStyle.Render("•"), rec)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -479,9 +479,9 @@ func (c *PQCCommand) ShowStyledReport(logger *log.Logger) error {
 func ExecuteWithFang(ctx context.Context) error {
 	// Initialize i18n early based on command line arguments
 	initI18nForCLI(os.Args)
-	
+
 	rootCmd := NewRootCmd()
-	
+
 	// Apply Fang enhancements
 	return fang.Execute(ctx, rootCmd)
 }

@@ -42,7 +42,7 @@ func testSuccessfulKeyAuth(t *testing.T) {
 
 	// Generate client key pair
 	clientPrivKey, clientPubKey := generateTestKeyPair(t)
-	
+
 	// Write client private key to file
 	clientKeyPath := filepath.Join(tempDir, "client_key")
 	if err := writePrivateKeyToFile(clientPrivKey, clientKeyPath); err != nil {
@@ -68,10 +68,10 @@ func testFailedKeyAuth(t *testing.T) {
 
 	// Generate client key pair
 	clientPrivKey, _ := generateTestKeyPair(t)
-	
+
 	// Generate different server-accepted key
 	_, serverPubKey := generateTestKeyPair(t)
-	
+
 	// Write client private key to file
 	clientKeyPath := filepath.Join(tempDir, "client_key")
 	if err := writePrivateKeyToFile(clientPrivKey, clientKeyPath); err != nil {
@@ -110,16 +110,16 @@ func writePrivateKeyToFile(privateKey *rsa.PrivateKey, filename string) error {
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 	}
-	
+
 	privateKeyBytes := pem.EncodeToMemory(privKeyPEM)
 	return os.WriteFile(filename, privateKeyBytes, 0600)
 }
 
 // MockSSHServer represents a mock SSH server for testing
 type MockSSHServer struct {
-	listener   net.Listener
+	listener      net.Listener
 	authorizedKey ssh.PublicKey
-	serverKey   ssh.Signer
+	serverKey     ssh.Signer
 }
 
 // startMockSSHServer starts a mock SSH server that accepts the given public key
@@ -259,19 +259,19 @@ func testSSHConnection(t *testing.T, serverAddr, keyPath string, expectSuccess b
 
 	// Perform SSH handshake
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, serverAddr, sshConfig)
-	
+
 	if expectSuccess {
 		if err != nil {
 			t.Errorf("Expected successful SSH connection, but got error: %v", err)
 			return
 		}
 		defer sshConn.Close()
-		
+
 		client := ssh.NewClient(sshConn, chans, reqs)
 		defer client.Close()
-		
+
 		t.Log("✓ SSH authentication successful")
-		
+
 		// Test that we can create a session
 		session, err := client.NewSession()
 		if err != nil {
@@ -279,9 +279,9 @@ func testSSHConnection(t *testing.T, serverAddr, keyPath string, expectSuccess b
 			return
 		}
 		defer session.Close()
-		
+
 		t.Log("✓ SSH session created successfully")
-		
+
 	} else {
 		if err == nil {
 			if sshConn != nil {
@@ -315,7 +315,7 @@ func TestCreateSSHAuthMethodsMock(t *testing.T) {
 		{
 			name:        "invalid_key_path_mock",
 			keyPath:     "/nonexistent/key",
-			user:        "testuser", 
+			user:        "testuser",
 			targetHost:  "testhost",
 			expectError: false,
 			description: "Should fallback to password auth in mock context",
@@ -325,30 +325,30 @@ func TestCreateSSHAuthMethodsMock(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := createTestLogger()
-			
+
 			authMethods, err := createSSHAuthMethods(tt.keyPath, tt.user, tt.targetHost, logger)
-			
+
 			if tt.expectError && err == nil {
 				t.Error("Expected error but got none")
 				return
 			}
-			
+
 			if !tt.expectError && err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				return
 			}
-			
+
 			if len(authMethods) == 0 {
 				t.Error("No authentication methods returned")
 				return
 			}
-			
+
 			// Should always have at least password authentication
 			if len(authMethods) < 1 {
 				t.Error("Expected at least password authentication method")
 				return
 			}
-			
+
 			t.Logf("✓ %s: Got %d authentication methods", tt.description, len(authMethods))
 		})
 	}

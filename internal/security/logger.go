@@ -14,24 +14,24 @@ var version = "0.4.0"
 
 // SecurityEvent represents a security-relevant event for audit logging
 type SecurityEvent struct {
-	Timestamp   time.Time `json:"timestamp"`
-	EventType   string    `json:"event_type"`
-	Severity    string    `json:"severity"`
-	User        string    `json:"user"`
-	Host        string    `json:"host"`
-	Action      string    `json:"action"`
-	Details     string    `json:"details"`
-	UserAgent   string    `json:"user_agent"`
-	Success     bool      `json:"success"`
-	IPAddress   string    `json:"ip_address,omitempty"`
-	SessionID   string    `json:"session_id,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+	EventType string    `json:"event_type"`
+	Severity  string    `json:"severity"`
+	User      string    `json:"user"`
+	Host      string    `json:"host"`
+	Action    string    `json:"action"`
+	Details   string    `json:"details"`
+	UserAgent string    `json:"user_agent"`
+	Success   bool      `json:"success"`
+	IPAddress string    `json:"ip_address,omitempty"`
+	SessionID string    `json:"session_id,omitempty"`
 }
 
 // SecurityLogger handles security audit logging
 type SecurityLogger struct {
-	enabled  bool
-	logFile  *os.File
-	logger   *log.Logger
+	enabled bool
+	logFile *os.File
+	logger  *log.Logger
 }
 
 // Global security logger instance
@@ -118,7 +118,7 @@ func (sl *SecurityLogger) logSecurityEvent(event SecurityEvent) {
 	eventJSON, err := json.Marshal(event)
 	if err != nil {
 		// Fallback to simple text logging if JSON fails
-		sl.logger.Printf("[SECURITY] %s %s %s: %s - %s", 
+		sl.logger.Printf("[SECURITY] %s %s %s: %s - %s",
 			event.Timestamp.Format(time.RFC3339),
 			event.Severity,
 			event.EventType,
@@ -144,7 +144,7 @@ func LogInsecureModeUsage(host, user string, forced bool, confirmed bool) {
 
 	action := "insecure_mode_used"
 	details := fmt.Sprintf("Host key verification disabled for connection to %s", host)
-	
+
 	if forced {
 		details += " (forced via --force-insecure flag)"
 	} else if confirmed {

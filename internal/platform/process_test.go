@@ -177,7 +177,7 @@ func TestHideCredentialsInProcessList(t *testing.T) {
 
 func TestProcessSecurityIntegration(t *testing.T) {
 	// Integration test to verify all process security measures work together
-	
+
 	// Save original environment
 	originalEnv := map[string]string{
 		"SSH_AUTH_SOCK": os.Getenv("SSH_AUTH_SOCK"),
@@ -270,7 +270,7 @@ func BenchmarkSetSecureEnvironment(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		SetSecureEnvironment()
-		
+
 		// Reset for next iteration
 		os.Setenv("SSH_AUTH_SOCK", "/tmp/bench-test")
 		os.Setenv("SSH_AGENT_PID", "12345")

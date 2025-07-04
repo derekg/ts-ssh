@@ -10,7 +10,7 @@ func maskProcessTitle(title string) {
 	if title == "" {
 		title = "ts-ssh [secure connection]"
 	}
-	
+
 	// Use platform-specific implementation
 	maskProcessTitlePlatform(title)
 }
@@ -20,11 +20,11 @@ func maskProcessTitle(title string) {
 func SetSecureEnvironment() {
 	// Clear potentially sensitive environment variables
 	sensitiveVars := []string{
-		"SSH_AUTH_SOCK",    // Don't inherit SSH agent
-		"SSH_AGENT_PID",    // Don't inherit SSH agent PID
-		"DISPLAY",          // Clear X11 display for security
+		"SSH_AUTH_SOCK", // Don't inherit SSH agent
+		"SSH_AGENT_PID", // Don't inherit SSH agent PID
+		"DISPLAY",       // Clear X11 display for security
 	}
-	
+
 	for _, varName := range sensitiveVars {
 		os.Unsetenv(varName)
 	}
@@ -35,7 +35,7 @@ func SetSecureEnvironment() {
 func HideCredentialsInProcessList() {
 	// Set generic process title
 	maskProcessTitle("ts-ssh [secure]")
-	
+
 	// Clean environment of sensitive variables
 	SetSecureEnvironment()
 }

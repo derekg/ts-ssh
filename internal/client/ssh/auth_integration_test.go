@@ -210,7 +210,7 @@ func testSSHKeyLoading(t *testing.T, privateKeyPath string, usePassphrase, expec
 
 	// Test LoadPrivateKey function
 	logger := createTestLogger()
-	
+
 	// For passphrase-protected keys, we'll need to mock the passphrase input
 	// For now, we'll test the non-passphrase scenario directly
 	if !usePassphrase {
@@ -355,10 +355,10 @@ func createQuietLogger() *log.Logger {
 // TestSSHConnectionHelpers tests SSH connection helper functions
 func TestSSHConnectionHelpers(t *testing.T) {
 	tests := []struct {
-		name           string
-		config         SSHConnectionConfig
-		expectError    bool
-		description    string
+		name        string
+		config      SSHConnectionConfig
+		expectError bool
+		description string
 	}{
 		{
 			name: "valid_config_no_key",
@@ -455,7 +455,7 @@ func TestSSHKeyGeneration(t *testing.T) {
 
 	t.Run("generate_unprotected_key", func(t *testing.T) {
 		privPath, pubPath := generateSSHKeyPair(t, tempDir, false)
-		
+
 		// Verify files exist
 		if _, err := os.Stat(privPath); err != nil {
 			t.Errorf("Private key file not created: %v", err)
@@ -479,7 +479,7 @@ func TestSSHKeyGeneration(t *testing.T) {
 
 	t.Run("generate_protected_key", func(t *testing.T) {
 		privPath, pubPath := generateSSHKeyPair(t, tempDir, true)
-		
+
 		// Verify files exist
 		if _, err := os.Stat(privPath); err != nil {
 			t.Errorf("Private key file not created: %v", err)

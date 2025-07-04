@@ -40,7 +40,7 @@ func DefaultConfig() *Config {
 		EnablePQC:              true,
 		QuantumResistance:      QuantumResistanceHybrid,
 		AllowClassicalFallback: true,
-		LogPQCUsage:           true,
+		LogPQCUsage:            true,
 		PreferredPQCAlgos: []string{
 			"sntrup761x25519-sha512@openssh.com", // OpenSSH 9.0+ PQC
 			"mlkem768x25519-sha256",              // NIST ML-KEM (future)
@@ -97,10 +97,10 @@ var SupportedPQCKeyExchanges = []string{
 
 // Quantum-resistant signature algorithms (Ed25519 is quantum-resistant for signatures)
 var QuantumResistantSignatures = []string{
-	"ssh-ed25519",                           // 128-bit post-quantum security
-	"ssh-ed25519-cert-v01@openssh.com",     // Ed25519 certificates
-	"rsa-sha2-512",                          // Larger RSA for better resistance
-	"rsa-sha2-256",                          // Larger RSA for better resistance
+	"ssh-ed25519",                      // 128-bit post-quantum security
+	"ssh-ed25519-cert-v01@openssh.com", // Ed25519 certificates
+	"rsa-sha2-512",                     // Larger RSA for better resistance
+	"rsa-sha2-256",                     // Larger RSA for better resistance
 }
 
 // IsPQCKeyExchange checks if an algorithm is a PQC key exchange
@@ -132,7 +132,7 @@ func ConfigureSSHConfig(config *ssh.ClientConfig, pqcConfig *Config) {
 	// Prepend PQC key exchanges to prefer them
 	if pqcConfig.QuantumResistance >= QuantumResistanceHybrid {
 		kexAlgos := make([]string, 0, len(pqcConfig.PreferredPQCAlgos)+len(config.KeyExchanges))
-		
+
 		// Add PQC algorithms first
 		for _, algo := range pqcConfig.PreferredPQCAlgos {
 			// Only add algorithms that OpenSSH currently supports
@@ -140,12 +140,12 @@ func ConfigureSSHConfig(config *ssh.ClientConfig, pqcConfig *Config) {
 				kexAlgos = append(kexAlgos, algo)
 			}
 		}
-		
+
 		// Add classical algorithms if fallback is allowed
 		if pqcConfig.AllowClassicalFallback {
 			kexAlgos = append(kexAlgos, config.KeyExchanges...)
 		}
-		
+
 		config.KeyExchanges = kexAlgos
 	}
 

@@ -41,11 +41,11 @@ type Config struct {
 	InsecureHostKey bool   `fang:"insecure" help:"Skip host key verification (insecure)"`
 	ForceInsecure   bool   `fang:"force-insecure" help:"Force insecure mode without confirmation"`
 	Language        string `fang:"lang" help:"Set language for output (en, es, fr, de, etc.)"`
-	
+
 	// Post-quantum cryptography options
 	EnablePQC bool `fang:"pqc" default:"true" help:"Enable post-quantum cryptography"`
 	PQCLevel  int  `fang:"pqc-level" default:"1" help:"PQC level: 0=none, 1=hybrid, 2=strict"`
-	
+
 	// Global flags for all commands
 	Help    bool `fang:"help,h" help:"Show help"`
 	Version bool `fang:"version" help:"Show version information"`
@@ -103,10 +103,10 @@ type ConfigCommand struct {
 // PQCCommand handles post-quantum cryptography operations
 type PQCCommand struct {
 	*Config
-	Report         bool `fang:"report,r" help:"Generate PQC usage report"`
-	Test           bool `fang:"test,t" help:"Test PQC functionality"`
-	Benchmark      bool `fang:"benchmark,b" help:"Run PQC performance benchmarks"`
-	ShowSupported  bool `fang:"supported,s" help:"Show supported PQC algorithms"`
+	Report        bool `fang:"report,r" help:"Generate PQC usage report"`
+	Test          bool `fang:"test,t" help:"Test PQC functionality"`
+	Benchmark     bool `fang:"benchmark,b" help:"Run PQC performance benchmarks"`
+	ShowSupported bool `fang:"supported,s" help:"Show supported PQC algorithms"`
 }
 
 // VersionCommand shows version information
@@ -122,25 +122,25 @@ func (c *ConnectCommand) Run(ctx context.Context) error {
 		fmt.Println("Usage: ts-ssh connect [options] [user@]hostname[:port] [command...]")
 		fmt.Println("\nOptions:")
 		fmt.Println("  -u, --user         SSH username")
-		fmt.Println("  -i, --identity     SSH private key file") 
+		fmt.Println("  -i, --identity     SSH private key file")
 		fmt.Println("  -v, --verbose      Enable verbose logging")
 		fmt.Println("  --insecure         Skip host key verification")
 		fmt.Println("  --force-insecure   Force insecure mode without confirmation")
 		return nil
 	}
-	
+
 	if c.Version {
 		return showVersion(c.Config, false, false)
 	}
-	
+
 	// Initialize i18n with language preference
 	initI18n(c.Language)
-	
+
 	// Apply defaults
 	if err := c.applyDefaults(); err != nil {
-		return fmt.Errorf("failed to apply defaults: %w", err)
+		return fmt.Errorf("%s: %w", T("failed_to_apply_defaults"), err)
 	}
-	
+
 	// Validate insecure mode
 	if err := validateInsecureMode(c.InsecureHostKey, c.ForceInsecure, "", ""); err != nil {
 		return err
@@ -153,7 +153,7 @@ func (c *ConnectCommand) Run(ctx context.Context) error {
 
 	// Check if target is provided
 	if c.Target == "" {
-		return fmt.Errorf("target hostname required. Usage: ts-ssh connect [user@]hostname[:port]")
+		return fmt.Errorf("%s. Usage: ts-ssh connect [user@]hostname[:port]", T("target_hostname_required"))
 	}
 
 	// Parse target
@@ -176,7 +176,7 @@ func (c *ConnectCommand) Run(ctx context.Context) error {
 		SSHKeyPath:      c.SSHKeyPath,
 		TsnetDir:        c.TsnetDir,
 		TsControlURL:    c.TsControlURL,
-		Target:          c.Target,  // This is the full target including any user@ prefix
+		Target:          c.Target, // This is the full target including any user@ prefix
 		Verbose:         c.Verbose,
 		InsecureHostKey: c.InsecureHostKey,
 		ForwardDest:     c.ForwardDest,
@@ -184,7 +184,7 @@ func (c *ConnectCommand) Run(ctx context.Context) error {
 		PQCLevel:        c.PQCLevel,
 		RemoteCmd:       c.Command,
 	}
-	
+
 	// Set up logger
 	appConfig.Logger = getLogger(c.Verbose)
 
@@ -196,11 +196,11 @@ func (c *SCPCommand) Run(ctx context.Context) error {
 	if c.Version {
 		return showVersion(c.Config, false, false)
 	}
-	
+
 	initI18n(c.Language)
-	
+
 	if err := c.applyDefaults(); err != nil {
-		return fmt.Errorf("failed to apply defaults: %w", err)
+		return fmt.Errorf("%s: %w", T("failed_to_apply_defaults"), err)
 	}
 
 	// Parse SCP arguments
@@ -234,25 +234,25 @@ func (c *ListCommand) Run(ctx context.Context) error {
 	if c.Version {
 		return showVersion(c.Config, false, false)
 	}
-	
+
 	initI18n(c.Language)
-	
+
 	if err := c.applyDefaults(); err != nil {
-		return fmt.Errorf("failed to apply defaults: %w", err)
+		return fmt.Errorf("%s: %w", T("failed_to_apply_defaults"), err)
 	}
 
 	// Create app config for compatibility
 	appConfig := &AppConfig{
-		TsnetDir:     c.TsnetDir,
-		TsControlURL: c.TsControlURL,
-		Verbose:      c.Verbose,
-		SSHUser:      c.SSHUser,
-		SSHKeyPath:   c.SSHKeyPath,
+		TsnetDir:        c.TsnetDir,
+		TsControlURL:    c.TsControlURL,
+		Verbose:         c.Verbose,
+		SSHUser:         c.SSHUser,
+		SSHKeyPath:      c.SSHKeyPath,
 		InsecureHostKey: c.InsecureHostKey,
-		ListHosts:    !c.Interactive,
-		PickHost:     c.Interactive,
+		ListHosts:       !c.Interactive,
+		PickHost:        c.Interactive,
 	}
-	
+
 	// Set up logger
 	appConfig.Logger = getLogger(c.Verbose)
 
@@ -264,11 +264,11 @@ func (c *ExecCommand) Run(ctx context.Context) error {
 	if c.Version {
 		return showVersion(c.Config, false, false)
 	}
-	
+
 	initI18n(c.Language)
-	
+
 	if err := c.applyDefaults(); err != nil {
-		return fmt.Errorf("failed to apply defaults: %w", err)
+		return fmt.Errorf("%s: %w", T("failed_to_apply_defaults"), err)
 	}
 
 	// Create app config for compatibility
@@ -294,11 +294,11 @@ func (c *MultiCommand) Run(ctx context.Context) error {
 	if c.Version {
 		return showVersion(c.Config, false, false)
 	}
-	
+
 	initI18n(c.Language)
-	
+
 	if err := c.applyDefaults(); err != nil {
-		return fmt.Errorf("failed to apply defaults: %w", err)
+		return fmt.Errorf("%s: %w", T("failed_to_apply_defaults"), err)
 	}
 
 	// Create app config for compatibility
@@ -323,21 +323,21 @@ func (c *ConfigCommand) Run(ctx context.Context) error {
 	if c.Version {
 		return showVersion(c.Config, false, false)
 	}
-	
+
 	initI18n(c.Language)
-	
+
 	if c.Show {
 		return c.showConfiguration()
 	}
-	
+
 	if c.Set != "" {
 		return c.setConfiguration(c.Set, c.Global)
 	}
-	
+
 	if c.Unset != "" {
 		return c.unsetConfiguration(c.Unset, c.Global)
 	}
-	
+
 	if c.Reset {
 		return c.resetConfiguration(c.Global)
 	}
@@ -350,11 +350,11 @@ func (c *PQCCommand) Run(ctx context.Context) error {
 	if c.Version {
 		return showVersion(c.Config, false, false)
 	}
-	
+
 	initI18n(c.Language)
-	
+
 	if err := c.applyDefaults(); err != nil {
-		return fmt.Errorf("failed to apply defaults: %w", err)
+		return fmt.Errorf("%s: %w", T("failed_to_apply_defaults"), err)
 	}
 
 	logger := getLogger(c.Verbose)
@@ -435,7 +435,7 @@ func (c *SCPCommand) parseScpArgs() (*scpArgs, error) {
 	if sourceHasColon && destHasColon {
 		return nil, fmt.Errorf("both source and destination cannot be remote")
 	}
-	
+
 	if !sourceHasColon && !destHasColon {
 		return nil, fmt.Errorf("either source or destination must be remote")
 	}
@@ -446,7 +446,7 @@ func (c *SCPCommand) parseScpArgs() (*scpArgs, error) {
 		// Download: remote -> local
 		args.isUpload = false
 		args.localPath = c.Destination
-		
+
 		host, path, user, err := parseScpRemoteArg(c.Source, c.SSHUser)
 		if err != nil {
 			return nil, err
@@ -458,7 +458,7 @@ func (c *SCPCommand) parseScpArgs() (*scpArgs, error) {
 		// Upload: local -> remote
 		args.isUpload = true
 		args.localPath = c.Source
-		
+
 		host, path, user, err := parseScpRemoteArg(c.Destination, c.SSHUser)
 		if err != nil {
 			return nil, err
@@ -488,16 +488,16 @@ func showVersion(config *Config, short, commit bool) error {
 	if commit {
 		fmt.Printf("Build: %s\n", version) // In a real implementation, this would show commit hash
 	}
-	
+
 	fmt.Printf("Go version: %s\n", runtime.Version())
 	fmt.Printf("Platform: %s/%s\n", runtime.GOOS, runtime.GOARCH)
-	
+
 	if config.EnablePQC {
 		fmt.Printf("PQC: Enabled (Level %d)\n", config.PQCLevel)
 	} else {
 		fmt.Println("PQC: Disabled")
 	}
-	
+
 	return nil
 }
 
@@ -524,7 +524,7 @@ func (c *SimpleCLI) Run(ctx context.Context, args []string) error {
 func NewCLI() *SimpleCLI {
 	// Initialize i18n early with default language
 	initI18n("")
-	
+
 	cli := &SimpleCLI{
 		commands: make(map[string]func(context.Context, []string) error),
 	}
@@ -605,8 +605,8 @@ func NewCLI() *SimpleCLI {
 
 // CommandArgs holds parsed command arguments
 type CommandArgs struct {
-	Config      *Config
-	Positional  []string
+	Config     *Config
+	Positional []string
 }
 
 // parseArgs parses command line arguments into a Config struct and positional args
@@ -615,9 +615,9 @@ func parseArgs(args []string) *CommandArgs {
 		EnablePQC: true,
 		PQCLevel:  1,
 	}
-	
+
 	var positional []string
-	
+
 	// Simple flag parsing
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -678,7 +678,7 @@ func parseArgs(args []string) *CommandArgs {
 			}
 		}
 	}
-	
+
 	return &CommandArgs{
 		Config:     config,
 		Positional: positional,
@@ -706,14 +706,14 @@ func (c *ConfigCommand) setConfiguration(keyValue string, global bool) error {
 	if len(parts) != 2 {
 		return fmt.Errorf("invalid format, expected key=value")
 	}
-	
+
 	key, value := parts[0], parts[1]
 	fmt.Printf("Setting %s = %s", key, value)
 	if global {
 		fmt.Print(" (global)")
 	}
 	fmt.Println()
-	
+
 	// TODO: Implement actual configuration persistence
 	return fmt.Errorf("configuration persistence not yet implemented")
 }
@@ -724,7 +724,7 @@ func (c *ConfigCommand) unsetConfiguration(key string, global bool) error {
 		fmt.Print(" (global)")
 	}
 	fmt.Println()
-	
+
 	// TODO: Implement actual configuration persistence
 	return fmt.Errorf("configuration persistence not yet implemented")
 }
@@ -735,7 +735,7 @@ func (c *ConfigCommand) resetConfiguration(global bool) error {
 		scope = "global"
 	}
 	fmt.Printf("Resetting %s configuration to defaults\n", scope)
-	
+
 	// TODO: Implement actual configuration reset
 	return fmt.Errorf("configuration reset not yet implemented")
 }
@@ -758,26 +758,26 @@ func (c *PQCCommand) showSupportedAlgorithms() error {
 
 func (c *PQCCommand) testPQCFunctionality(logger *log.Logger) error {
 	fmt.Println("Testing Post-Quantum Cryptography functionality...")
-	
+
 	// TODO: Implement actual PQC testing
 	fmt.Println("✓ Kyber768 key exchange")
 	fmt.Println("✓ Dilithium3 signatures")
 	fmt.Println("✓ Hybrid mode compatibility")
 	fmt.Println("All PQC tests passed!")
-	
+
 	return nil
 }
 
 func (c *PQCCommand) runPQCBenchmarks(logger *log.Logger) error {
 	fmt.Println("Running Post-Quantum Cryptography benchmarks...")
-	
+
 	// TODO: Implement actual PQC benchmarks
 	fmt.Println("Kyber768 Key Generation: 1.2ms")
 	fmt.Println("Kyber768 Encapsulation: 0.8ms")
 	fmt.Println("Kyber768 Decapsulation: 1.1ms")
 	fmt.Println("Dilithium3 Sign: 2.3ms")
 	fmt.Println("Dilithium3 Verify: 1.7ms")
-	
+
 	return nil
 }
 
@@ -785,19 +785,19 @@ func (c *PQCCommand) showPQCStatus(logger *log.Logger) error {
 	fmt.Println("Post-Quantum Cryptography Status:")
 	fmt.Printf("  Enabled: %t\n", c.EnablePQC)
 	fmt.Printf("  Level: %d\n", c.PQCLevel)
-	
+
 	levelDesc := map[int]string{
 		0: "Disabled",
 		1: "Hybrid (Classical + PQC)",
 		2: "Strict PQC Only",
 	}
-	
+
 	if desc, ok := levelDesc[c.PQCLevel]; ok {
 		fmt.Printf("  Description: %s\n", desc)
 	}
-	
+
 	ready, assessment := pqc.CheckGlobalQuantumReadiness(logger)
 	fmt.Printf("  Quantum Readiness: %v - %s\n", ready, assessment)
-	
+
 	return nil
 }

@@ -1,12 +1,12 @@
 package scp
 
 import (
-	"fmt"
-	"os"
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net"
+	"os"
 	"os/user"
 	"time"
 
@@ -28,13 +28,13 @@ const (
 // TODO: Replace with proper i18n integration
 func T(key string, args ...interface{}) string {
 	translations := map[string]string{
-		"scp_empty_path": "SCP path cannot be empty",
-		"scp_enter_password": "Enter password for %s@%s: ",
-		"dial_via_tsnet": "Connecting via tsnet...",
-		"dial_failed": "Connection failed",
+		"scp_empty_path":       "SCP path cannot be empty",
+		"scp_enter_password":   "Enter password for %s@%s: ",
+		"dial_via_tsnet":       "Connecting via tsnet...",
+		"dial_failed":          "Connection failed",
 		"scp_host_key_warning": "WARNING: SCP host key verification disabled",
 	}
-	
+
 	if msg, ok := translations[key]; ok {
 		if len(args) > 0 {
 			return fmt.Sprintf(msg, args...)
@@ -43,6 +43,7 @@ func T(key string, args ...interface{}) string {
 	}
 	return key
 }
+
 // Removed "fmt" and "os" as they are available from main package context
 // Removed "golang.org/x/crypto/ssh/knownhosts" as it's not directly used here
 // Removed "path/filepath" as it's not used
@@ -77,7 +78,7 @@ func HandleCliScp(
 	var authMethods []ssh.AuthMethod
 	if sshKeyPath != "" {
 		// Call the exported function from ssh_client.go
-		keyAuth, keyErr := sshclient.LoadPrivateKey(sshKeyPath, logger) 
+		keyAuth, keyErr := sshclient.LoadPrivateKey(sshKeyPath, logger)
 		if keyErr == nil {
 			authMethods = append(authMethods, keyAuth)
 			logger.Printf("CLI SCP: Using public key authentication: %s", sshKeyPath)
@@ -127,15 +128,15 @@ func HandleCliScp(
 	if err != nil {
 		return fmt.Errorf("CLI SCP: tsnet dial failed for %s: %w", sshTargetAddr, err)
 	}
-	
+
 	logger.Printf("CLI SCP: tsnet Dial successful. Establishing SSH client for SCP...")
 	sshClientConn, chans, reqs, err := ssh.NewClientConn(conn, sshTargetAddr, &cliScpSSHConfig)
 	if err != nil {
-		conn.Close() 
+		conn.Close()
 		return fmt.Errorf("CLI SCP: failed to establish SSH client connection: %w", err)
 	}
 	sshClient := ssh.NewClient(sshClientConn, chans, reqs)
-	defer sshClient.Close() 
+	defer sshClient.Close()
 
 	scpCl, err := scp.NewClientBySSH(sshClient)
 	if err != nil {
@@ -164,7 +165,7 @@ func HandleCliScp(
 		logger.Println(T("scp_upload_complete"))
 	} else { // Download
 		logger.Printf("CLI SCP: Downloading %s@%s:%s to %s", sshUser, targetHost, remotePath, localPath)
-		
+
 		// Create file securely with atomic replacement to prevent race conditions
 		localFile, errOpen := security.CreateSecureDownloadFileWithReplace(localPath)
 		if errOpen != nil {

@@ -10,7 +10,7 @@ var (
 	// globalMonitor is a singleton monitor instance for tracking PQC usage
 	globalMonitor     *Monitor
 	globalMonitorOnce sync.Once
-	
+
 	// globalSelector is a singleton algorithm selector
 	globalSelector     *AlgorithmSelector
 	globalSelectorOnce sync.Once
@@ -40,19 +40,19 @@ func GetGlobalSelector(config *Config, logger *log.Logger) *AlgorithmSelector {
 func LogConnectionStatus(host string, keyExchange string, logger *log.Logger) {
 	monitor := GetGlobalMonitor(logger)
 	selector := GetGlobalSelector(nil, logger)
-	
+
 	status := &Status{
 		Enabled:              true,
 		KeyExchangeAlgorithm: keyExchange,
 		IsQuantumSafe:        IsPQCKeyExchange(keyExchange),
 		IsHybrid:             false, // Will be updated based on algorithm
 	}
-	
+
 	// Update hybrid status
 	if algo, exists := selector.GetAlgorithmInfo(keyExchange); exists {
 		status.IsHybrid = algo.QuantumSafe && strings.Contains(keyExchange, "x25519")
 	}
-	
+
 	status.SecurityLevel = status.GetSecurityLevel()
 	monitor.LogConnectionSecurity(host, status)
 }
