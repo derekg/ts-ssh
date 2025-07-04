@@ -74,17 +74,17 @@ func setupTerminal(session *ssh.Session, fd int, logger *log.Logger) error {
 		termWidth = DefaultTerminalWidth
 		termHeight = DefaultTerminalHeight
 	}
-	
+
 	termType := os.Getenv("TERM")
 	if termType == "" {
 		termType = DefaultTerminalType
 	}
-	
+
 	err = session.RequestPty(termType, termHeight, termWidth, ssh.TerminalModes{})
 	if err != nil {
 		return fmt.Errorf("failed to request pseudo-terminal: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -93,7 +93,7 @@ func handleInteractiveSession(session *ssh.Session, stdinPipe io.WriteCloser, fd
 	// Import GetGlobalTerminalState from main package - this needs to be accessible
 	// For now, create a simple terminal state manager
 	var terminalRestoreFn func() error
-	
+
 	// Set up terminal in raw mode if we're in a terminal
 	if term.IsTerminal(fd) {
 		oldState, err := term.MakeRaw(fd)
@@ -112,36 +112,36 @@ func handleInteractiveSession(session *ssh.Session, stdinPipe io.WriteCloser, fd
 				}
 			}()
 		}
-		
+
 		// Show escape sequence info (would need T() function from i18n)
 		fmt.Fprint(os.Stderr, "Use ~. to terminate connection\n")
 	}
-	
+
 	// Set up signal handling for graceful shutdown
 	done := make(chan bool, 1)
 	go handleInputWithTerminalState(stdinPipe, done, logger)
-	
+
 	// Handle window resize signals if in terminal
 	if term.IsTerminal(fd) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		go WatchWindowSize(fd, session, ctx, logger)
 	}
-	
+
 	// Wait for session to complete
 	err := session.Wait()
 	done <- true // Signal input handler to stop
-	
+
 	return err
 }
 
 // handleInputWithTerminalState handles stdin input
 func handleInputWithTerminalState(stdinPipe io.WriteCloser, done chan bool, logger *log.Logger) {
 	defer stdinPipe.Close()
-	
+
 	// Create a buffered reader for stdin
 	input := make([]byte, 1024)
-	
+
 	for {
 		select {
 		case <-done:
@@ -154,7 +154,7 @@ func handleInputWithTerminalState(stdinPipe io.WriteCloser, done chan bool, logg
 				}
 				return
 			}
-			
+
 			// Write to SSH session
 			_, writeErr := stdinPipe.Write(input[:n])
 			if writeErr != nil {
@@ -188,13 +188,13 @@ func promptUserViaTTY(prompt string, logger *log.Logger) (string, error) {
 // This replaces the old TUI-specific connection logic with standardized SSH helpers
 func ConnectToHost(
 	srv *tsnet.Server,
-	appCtx context.Context, 
+	appCtx context.Context,
 	logger *log.Logger,
-	targetHost string, 
+	targetHost string,
 	sshUser string,
 	sshKeyPath string,
 	insecureHostKey bool,
-	currentUser *user.User, 
+	currentUser *user.User,
 	verbose bool,
 ) error {
 	// Use the standard SSH helper configuration
@@ -267,7 +267,7 @@ func CreateKnownHostsCallback(currentUser *user.User, logger *log.Logger) (ssh.H
 			logger.Printf("Warning: Cannot determine user home directory for known_hosts: %v. Host key checking may be impaired or prompt.", err)
 			return nil, fmt.Errorf("user home directory unknown, cannot reliably manage known_hosts: %w", err)
 		}
-		currentUser = &user.User{HomeDir: home} 
+		currentUser = &user.User{HomeDir: home}
 		logger.Printf("Warning: currentUser was nil or HomeDir empty. Deduced home as %s for known_hosts.", home)
 	}
 
@@ -282,14 +282,14 @@ func CreateKnownHostsCallback(currentUser *user.User, logger *log.Logger) (ssh.H
 	if err != nil {
 		logger.Printf("Could not initialize known_hosts callback using %s: %v. Host key verification will prompt for every new host without persistence.", knownHostsPath, err)
 		return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-			return handleHostKey(hostname, remote, key, "", logger) 
+			return handleHostKey(hostname, remote, key, "", logger)
 		}, nil
 	}
 
 	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 		err := hostKeyCallback(hostname, remote, key)
 		if err == nil {
-			return nil 
+			return nil
 		}
 		var keyErr *knownhosts.KeyError
 		if errors.As(err, &keyErr) {
@@ -319,7 +319,7 @@ func handleHostKey(hostname string, remote net.Addr, key ssh.PublicKey, knownHos
 		for _, kh := range specificKeyError.Want {
 			fmt.Fprintf(os.Stderr, "Offending ECDSA key in %s:%d\n", kh.Filename, kh.Line)
 		}
-		return specificKeyError 
+		return specificKeyError
 	} else {
 		fmt.Fprintf(os.Stderr, "The authenticity of host '%s (%s)' can't be established.\n", hostname, remote.String())
 		fmt.Fprintf(os.Stderr, "%s key fingerprint is %s.\n", key.Type(), ssh.FingerprintSHA256(key))
@@ -332,7 +332,7 @@ func handleHostKey(hostname string, remote net.Addr, key ssh.PublicKey, knownHos
 		if strings.ToLower(answer) == "yes" {
 			if knownHostsPath == "" {
 				logger.Printf("Warning: Host key for %s accepted but known_hosts path is not available. Key not persisted.", hostname)
-				return nil 
+				return nil
 			}
 			return appendKnownHost(knownHostsPath, hostname, remote, key, logger)
 		} else if strings.ToLower(answer) == "fingerprint" {
@@ -365,11 +365,11 @@ func appendKnownHost(knownHostsPath, hostname string, remote net.Addr, key ssh.P
 		return fmt.Errorf("failed to open %s to append new key: %w", knownHostsPath, err)
 	}
 	defer f.Close()
-	
+
 	var addresses []string
 	normalizedRemoteAddr := knownhosts.Normalize(remote.String())
 	addresses = append(addresses, hostname)
-	if hostname != normalizedRemoteAddr && !strings.Contains(normalizedRemoteAddr, "[") { 
+	if hostname != normalizedRemoteAddr && !strings.Contains(normalizedRemoteAddr, "[") {
 		isDuplicate := false
 		for _, addr := range addresses {
 			if addr == normalizedRemoteAddr {
@@ -383,7 +383,7 @@ func appendKnownHost(knownHostsPath, hostname string, remote net.Addr, key ssh.P
 	}
 
 	line := knownhosts.Line(addresses, key)
-	if _, err := f.WriteString(line + "\n"); err != nil { 
+	if _, err := f.WriteString(line + "\n"); err != nil {
 		return fmt.Errorf("failed to write host key to %s: %w", knownHostsPath, err)
 	}
 	logger.Printf("Host key for %s (%s) added to %s.", hostname, key.Type(), knownHostsPath)
@@ -406,13 +406,13 @@ func WatchWindowSize(fd int, session *ssh.Session, ctx context.Context, logger *
 		logger.Println("Window resize monitoring not supported on Windows")
 		return
 	}
-	
+
 	sigCh := make(chan os.Signal, 1)
 	// Use reflection to access SIGWINCH on Unix platforms only
 	if sigWinch := getSigWinch(); sigWinch != nil {
 		signal.Notify(sigCh, sigWinch)
 	}
-	defer signal.Stop(sigCh) 
+	defer signal.Stop(sigCh)
 
 	if term.IsTerminal(fd) {
 		termWidth, termHeight, err := term.GetSize(fd)

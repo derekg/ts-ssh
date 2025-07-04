@@ -8,9 +8,9 @@ import (
 
 func TestCreateSSHConfig(t *testing.T) {
 	tests := []struct {
-		name     string
-		config   SSHConnectionConfig
-		wantUser string
+		name        string
+		config      SSHConnectionConfig
+		wantUser    string
 		wantTimeout time.Duration
 	}{
 		{
@@ -68,28 +68,28 @@ func TestCreateSSHConfig(t *testing.T) {
 
 func TestCreateSSHAuthMethods(t *testing.T) {
 	tests := []struct {
-		name        string
-		keyPath     string
-		user        string
-		targetHost  string
-		expectKey   bool
-		expectPass  bool
+		name       string
+		keyPath    string
+		user       string
+		targetHost string
+		expectKey  bool
+		expectPass bool
 	}{
 		{
-			name:        "empty key path",
-			keyPath:     "",
-			user:        "testuser",
-			targetHost:  "testhost",
-			expectKey:   false,
-			expectPass:  true,
+			name:       "empty key path",
+			keyPath:    "",
+			user:       "testuser",
+			targetHost: "testhost",
+			expectKey:  false,
+			expectPass: true,
 		},
 		{
-			name:        "invalid key path",
-			keyPath:     "/nonexistent/key",
-			user:        "testuser",
-			targetHost:  "testhost",
-			expectKey:   false,
-			expectPass:  true,
+			name:       "invalid key path",
+			keyPath:    "/nonexistent/key",
+			user:       "testuser",
+			targetHost: "testhost",
+			expectKey:  false,
+			expectPass: true,
 		},
 	}
 

@@ -173,27 +173,27 @@ func TestConstants(t *testing.T) {
 	if DefaultSshPort != "22" {
 		t.Errorf("DefaultSshPort = %v, want %v", DefaultSshPort, "22")
 	}
-	
+
 	if ClientName == "" {
 		t.Error("ClientName should not be empty")
 	}
-	
+
 	if DefaultSSHTimeout.Seconds() != 15 {
 		t.Errorf("DefaultSSHTimeout = %v seconds, want 15", DefaultSSHTimeout.Seconds())
 	}
-	
+
 	if DefaultSCPTimeout.Seconds() != 30 {
 		t.Errorf("DefaultSCPTimeout = %v seconds, want 30", DefaultSCPTimeout.Seconds())
 	}
-	
+
 	if DefaultTerminalWidth != 80 {
 		t.Errorf("DefaultTerminalWidth = %v, want 80", DefaultTerminalWidth)
 	}
-	
+
 	if DefaultTerminalHeight != 24 {
 		t.Errorf("DefaultTerminalHeight = %v, want 24", DefaultTerminalHeight)
 	}
-	
+
 	if DefaultTerminalType != "xterm-256color" {
 		t.Errorf("DefaultTerminalType = %v, want xterm-256color", DefaultTerminalType)
 	}

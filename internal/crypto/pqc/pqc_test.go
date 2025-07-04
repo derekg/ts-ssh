@@ -10,19 +10,19 @@ import (
 
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
-	
+
 	if !config.EnablePQC {
 		t.Error("Default config should have PQC enabled")
 	}
-	
+
 	if config.QuantumResistance != QuantumResistanceHybrid {
 		t.Errorf("Default quantum resistance should be Hybrid, got %d", config.QuantumResistance)
 	}
-	
+
 	if !config.AllowClassicalFallback {
 		t.Error("Default config should allow classical fallback")
 	}
-	
+
 	if len(config.PreferredPQCAlgos) == 0 {
 		t.Error("Default config should have preferred PQC algorithms")
 	}
@@ -40,7 +40,7 @@ func TestIsPQCKeyExchange(t *testing.T) {
 		{"ecdh-sha2-nistp256", false},
 		{"diffie-hellman-group14-sha256", false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.algo, func(t *testing.T) {
 			result := IsPQCKeyExchange(tt.algo)
@@ -63,7 +63,7 @@ func TestIsQuantumResistantSignature(t *testing.T) {
 		{"ecdsa-sha2-nistp256", false},
 		{"ssh-rsa", false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.algo, func(t *testing.T) {
 			result := IsQuantumResistantSignature(tt.algo)
@@ -127,7 +127,7 @@ func TestConfigureSSHConfig(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sshConfig := &ssh.ClientConfig{}
@@ -148,46 +148,46 @@ func TestAlgorithmSelector(t *testing.T) {
 			"mlkem768x25519-sha256",
 		},
 	}
-	
+
 	selector := NewAlgorithmSelector(config, logger)
-	
+
 	t.Run("SelectKeyExchange with PQC support", func(t *testing.T) {
 		serverAlgos := []string{
 			"curve25519-sha256@libssh.org",
 			"sntrup761x25519-sha512@openssh.com",
 			"ecdh-sha2-nistp256",
 		}
-		
+
 		selected, err := selector.SelectKeyExchange(serverAlgos)
 		if err != nil {
 			t.Fatalf("SelectKeyExchange failed: %v", err)
 		}
-		
+
 		if selected != "sntrup761x25519-sha512@openssh.com" {
 			t.Errorf("Expected PQC algorithm, got %s", selected)
 		}
-		
+
 		status := selector.GetConnectionStatus()
 		if !status.IsQuantumSafe {
 			t.Error("Connection should be quantum-safe")
 		}
 	})
-	
+
 	t.Run("SelectKeyExchange without PQC support", func(t *testing.T) {
 		serverAlgos := []string{
 			"curve25519-sha256@libssh.org",
 			"ecdh-sha2-nistp256",
 		}
-		
+
 		selected, err := selector.SelectKeyExchange(serverAlgos)
 		if err != nil {
 			t.Fatalf("SelectKeyExchange failed: %v", err)
 		}
-		
+
 		if selected != "curve25519-sha256@libssh.org" {
 			t.Errorf("Expected classical algorithm, got %s", selected)
 		}
-		
+
 		status := selector.GetConnectionStatus()
 		if status.IsQuantumSafe {
 			t.Error("Connection should not be quantum-safe")
@@ -199,7 +199,7 @@ func TestMonitor(t *testing.T) {
 	logger := log.New(&strings.Builder{}, "", 0)
 	config := DefaultConfig()
 	monitor := NewMonitor(logger, config)
-	
+
 	t.Run("RecordConnection", func(t *testing.T) {
 		// Record a quantum-safe connection
 		status := &Status{
@@ -209,7 +209,7 @@ func TestMonitor(t *testing.T) {
 			IsHybrid:             true,
 		}
 		monitor.RecordConnection(status)
-		
+
 		metrics := monitor.GetMetrics()
 		if metrics.TotalConnections != 1 {
 			t.Errorf("Expected 1 total connection, got %d", metrics.TotalConnections)
@@ -221,7 +221,7 @@ func TestMonitor(t *testing.T) {
 			t.Errorf("Expected 1 hybrid connection, got %d", metrics.HybridConnections)
 		}
 	})
-	
+
 	t.Run("GenerateReport", func(t *testing.T) {
 		report := monitor.GenerateReport()
 		if !strings.Contains(report, "Post-Quantum Cryptography Report") {
@@ -231,7 +231,7 @@ func TestMonitor(t *testing.T) {
 			t.Error("Report should show total connections")
 		}
 	})
-	
+
 	t.Run("CheckQuantumReadiness", func(t *testing.T) {
 		ready, assessment := monitor.CheckQuantumReadiness()
 		if !ready {
@@ -274,7 +274,7 @@ func TestStatus(t *testing.T) {
 			expected: "Classical Only",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.status.GetSecurityLevel()

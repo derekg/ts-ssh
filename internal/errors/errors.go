@@ -29,11 +29,11 @@ const (
 
 // TSError represents a structured error with operation context and error code
 type TSError struct {
-	Op       string    // Operation that failed (e.g., "ssh_connect", "parse_target")
-	Code     ErrorCode // Error classification
-	Err      error     // Underlying error
-	Context  string    // Additional context (optional)
-	Fatal    bool      // Whether this error should cause program exit
+	Op      string    // Operation that failed (e.g., "ssh_connect", "parse_target")
+	Code    ErrorCode // Error classification
+	Err     error     // Underlying error
+	Context string    // Additional context (optional)
+	Fatal   bool      // Whether this error should cause program exit
 }
 
 // Error implements the error interface

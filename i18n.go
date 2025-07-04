@@ -7,6 +7,8 @@ import (
 
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
+
+	internali18n "github.com/derekg/ts-ssh/internal/i18n"
 )
 
 // Supported languages (Top 10 most popular languages by speakers)
@@ -27,11 +29,11 @@ const (
 var (
 	// Global printer for internationalization
 	printer *message.Printer
-	
+
 	// Synchronization for thread-safe access
 	initI18nOnce sync.Once
 	printerMu    sync.RWMutex
-	
+
 	// Available languages
 	supportedLanguages = map[string]language.Tag{
 		LangEnglish:    language.English,
@@ -54,20 +56,23 @@ func initI18n(langFlag string) {
 	initI18nOnce.Do(func() {
 		registerMessages()
 	})
-	
+
 	// Determine language preference: CLI flag > env var > default
 	lang := determineLang(langFlag)
-	
+
 	// Get language tag
 	tag, exists := supportedLanguages[lang]
 	if !exists {
 		tag = language.English // fallback to English
 	}
-	
+
 	// Create printer for the selected language with thread-safe access
 	printerMu.Lock()
 	printer = message.NewPrinter(tag)
 	printerMu.Unlock()
+
+	// Also initialize the internal i18n package with the same language
+	internali18n.InitI18n(langFlag)
 }
 
 // determineLang determines which language to use based on priority:
@@ -80,21 +85,21 @@ func determineLang(langFlag string) string {
 	if langFlag != "" {
 		return normalizeLanguage(langFlag)
 	}
-	
+
 	// Check custom environment variable
 	if envLang := os.Getenv("TS_SSH_LANG"); envLang != "" {
 		return normalizeLanguage(envLang)
 	}
-	
+
 	// Check standard locale environment variables
 	if envLang := os.Getenv("LC_ALL"); envLang != "" {
 		return normalizeLanguage(envLang)
 	}
-	
+
 	if envLang := os.Getenv("LANG"); envLang != "" {
 		return normalizeLanguage(envLang)
 	}
-	
+
 	// Default to English
 	return LangEnglish
 }
@@ -102,7 +107,7 @@ func determineLang(langFlag string) string {
 // normalizeLanguage normalizes language codes to our supported format
 func normalizeLanguage(lang string) string {
 	lang = strings.ToLower(strings.TrimSpace(lang))
-	
+
 	// Handle common variations
 	switch {
 	case strings.HasPrefix(lang, "en") || lang == "english":
@@ -146,73 +151,73 @@ func registerMessages() {
 	message.SetString(language.Japanese, "usage_header", "使用法: %s [オプション] [ユーザー@]ホスト名[:ポート] [コマンド...]")
 	message.SetString(language.German, "usage_header", "Verwendung: %s [Optionen] [Benutzer@]Hostname[:Port] [Befehl...]")
 	message.SetString(language.French, "usage_header", "Utilisation: %s [options] [utilisateur@]nom_hôte[:port] [commande...]")
-	
+
 	message.SetString(language.English, "usage_list", "       %s --list                                    # List available hosts")
 	message.SetString(language.Spanish, "usage_list", "       %s --list                                    # Listar servidores disponibles")
-	
+
 	message.SetString(language.English, "usage_multi", "       %s --multi host1,host2,host3                # Multi-host tmux session")
 	message.SetString(language.Spanish, "usage_multi", "       %s --multi servidor1,servidor2,servidor3    # Sesión tmux multi-servidor")
-	
+
 	message.SetString(language.English, "usage_exec", "       %s --exec \"command\" host1,host2             # Run command on multiple hosts")
 	message.SetString(language.Spanish, "usage_exec", "       %s --exec \"comando\" servidor1,servidor2     # Ejecutar comando en múltiples servidores")
-	
+
 	message.SetString(language.English, "usage_copy", "       %s --copy file.txt host1,host2:/tmp/        # Copy file to multiple hosts")
 	message.SetString(language.Spanish, "usage_copy", "       %s --copy archivo.txt servidor1,servidor2:/tmp/ # Copiar archivo a múltiples servidores")
-	
+
 	message.SetString(language.English, "usage_pick", "       %s --pick                                   # Interactive host picker")
 	message.SetString(language.Spanish, "usage_pick", "       %s --pick                                   # Selector interactivo de servidores")
-	
+
 	message.SetString(language.English, "usage_description", "Powerful SSH/SCP tool for Tailscale networks.\n\nOptions:")
 	message.SetString(language.Spanish, "usage_description", "Herramienta SSH/SCP potente para redes Tailscale.\n\nOpciones:")
-	
+
 	message.SetString(language.English, "examples_header", "\nExamples:")
 	message.SetString(language.Spanish, "examples_header", "\nEjemplos:")
-	
+
 	message.SetString(language.English, "examples_basic_ssh", "  Basic SSH:")
 	message.SetString(language.Spanish, "examples_basic_ssh", "  SSH básico:")
-	
+
 	message.SetString(language.English, "examples_interactive", "    %s user@host                    # Interactive SSH session")
 	message.SetString(language.Spanish, "examples_interactive", "    %s usuario@servidor             # Sesión SSH interactiva")
-	
+
 	message.SetString(language.English, "examples_remote_cmd", "    %s user@host ls -lah            # Run remote command")
 	message.SetString(language.Spanish, "examples_remote_cmd", "    %s usuario@servidor ls -lah     # Ejecutar comando remoto")
-	
+
 	message.SetString(language.English, "examples_host_discovery", "\n  Host Discovery:")
 	message.SetString(language.Spanish, "examples_host_discovery", "\n  Descubrimiento de servidores:")
-	
+
 	message.SetString(language.English, "examples_list_hosts", "    %s --list                       # Show all Tailscale hosts")
 	message.SetString(language.Spanish, "examples_list_hosts", "    %s --list                       # Mostrar todos los servidores Tailscale")
-	
+
 	message.SetString(language.English, "examples_pick_host", "    %s --pick                       # Pick host interactively")
 	message.SetString(language.Spanish, "examples_pick_host", "    %s --pick                       # Elegir servidor interactivamente")
-	
+
 	message.SetString(language.English, "examples_multi_host", "\n  Multi-Host Operations:")
 	message.SetString(language.Spanish, "examples_multi_host", "\n  Operaciones multi-servidor:")
-	
+
 	message.SetString(language.English, "examples_tmux", "    %s --multi web1,web2,db1        # Tmux session with 3 hosts")
 	message.SetString(language.Spanish, "examples_tmux", "    %s --multi web1,web2,db1        # Sesión tmux con 3 servidores")
-	
+
 	message.SetString(language.English, "examples_exec_multi", "    %s --exec \"uptime\" web1,web2    # Run command on 2 hosts")
 	message.SetString(language.Spanish, "examples_exec_multi", "    %s --exec \"uptime\" web1,web2    # Ejecutar comando en 2 servidores")
-	
+
 	message.SetString(language.English, "examples_parallel", "    %s --parallel --exec \"ps aux\" web1,web2  # Parallel execution")
 	message.SetString(language.Spanish, "examples_parallel", "    %s --parallel --exec \"ps aux\" web1,web2  # Ejecución paralela")
-	
+
 	message.SetString(language.English, "examples_file_transfer", "\n  File Transfer:")
 	message.SetString(language.Spanish, "examples_file_transfer", "\n  Transferencia de archivos:")
-	
+
 	message.SetString(language.English, "examples_scp_single", "    %s local.txt user@host:/remote/ # Single SCP upload")
 	message.SetString(language.Spanish, "examples_scp_single", "    %s local.txt usuario@servidor:/remoto/ # Subida SCP única")
-	
+
 	message.SetString(language.English, "examples_scp_multi", "    %s --copy deploy.sh web1,web2:/tmp/  # Multi-host SCP")
 	message.SetString(language.Spanish, "examples_scp_multi", "    %s --copy deploy.sh web1,web2:/tmp/  # SCP multi-servidor")
-	
+
 	message.SetString(language.English, "examples_proxy", "\n  ProxyCommand:")
 	message.SetString(language.Spanish, "examples_proxy", "\n  ComandoProxy:")
-	
+
 	message.SetString(language.English, "examples_proxy_cmd", "    %s -W host:port                 # Proxy stdio via Tailscale")
 	message.SetString(language.Spanish, "examples_proxy_cmd", "    %s -W servidor:puerto           # Proxy stdio vía Tailscale")
-	
+
 	// Error messages
 	message.SetString(language.English, "error_init_tailscale", "Failed to initialize Tailscale connection: %v")
 	message.SetString(language.Spanish, "error_init_tailscale", "Error al inicializar conexión Tailscale: %v")
@@ -225,7 +230,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "error_init_tailscale", "Tailscale接続の初期化に失敗しました: %v")
 	message.SetString(language.German, "error_init_tailscale", "Fehler beim Initialisieren der Tailscale-Verbindung: %v")
 	message.SetString(language.French, "error_init_tailscale", "Échec de l'initialisation de la connexion Tailscale: %v")
-	
+
 	message.SetString(language.English, "error_scp_failed", "SCP operation failed: %v")
 	message.SetString(language.Spanish, "error_scp_failed", "Operación SCP falló: %v")
 	message.SetString(language.Chinese, "error_scp_failed", "SCP 操作失败: %v")
@@ -237,7 +242,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "error_scp_failed", "SCP操作が失敗しました: %v")
 	message.SetString(language.German, "error_scp_failed", "SCP-Operation fehlgeschlagen: %v")
 	message.SetString(language.French, "error_scp_failed", "L'opération SCP a échoué: %v")
-	
+
 	message.SetString(language.English, "scp_success", "SCP operation completed successfully.")
 	message.SetString(language.Spanish, "scp_success", "Operación SCP completada exitosamente.")
 	message.SetString(language.Chinese, "scp_success", "SCP 操作成功完成。")
@@ -249,7 +254,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "scp_success", "SCP操作が正常に完了しました。")
 	message.SetString(language.German, "scp_success", "SCP-Operation erfolgreich abgeschlossen.")
 	message.SetString(language.French, "scp_success", "Opération SCP terminée avec succès.")
-	
+
 	message.SetString(language.English, "error_parsing_target", "Error parsing target for SSH: %v")
 	message.SetString(language.Spanish, "error_parsing_target", "Error analizando destino para SSH: %v")
 	message.SetString(language.Chinese, "error_parsing_target", "解析 SSH 目标错误: %v")
@@ -261,10 +266,10 @@ func registerMessages() {
 	message.SetString(language.Japanese, "error_parsing_target", "SSH のターゲット解析エラー: %v")
 	message.SetString(language.German, "error_parsing_target", "Fehler beim Parsen des SSH-Ziels: %v")
 	message.SetString(language.French, "error_parsing_target", "Erreur lors de l'analyse de la cible SSH: %v")
-	
+
 	message.SetString(language.English, "error_init_ssh", "Failed to initialize Tailscale connection for SSH: %v")
 	message.SetString(language.Spanish, "error_init_ssh", "Error al inicializar conexión Tailscale para SSH: %v")
-	
+
 	// Authentication messages
 	message.SetString(language.English, "enter_password", "Enter password for %s@%s: ")
 	message.SetString(language.Spanish, "enter_password", "Ingresa contraseña para %s@%s: ")
@@ -277,7 +282,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "enter_password", "%s@%s のパスワードを入力: ")
 	message.SetString(language.German, "enter_password", "Passwort für %s@%s eingeben: ")
 	message.SetString(language.French, "enter_password", "Entrez le mot de passe pour %s@%s: ")
-	
+
 	message.SetString(language.English, "host_key_warning", "WARNING: Host key verification is disabled!")
 	message.SetString(language.Spanish, "host_key_warning", "ADVERTENCIA: ¡Verificación de clave de servidor deshabilitada!")
 	message.SetString(language.Chinese, "host_key_warning", "警告：主机密钥验证已禁用！")
@@ -289,7 +294,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "host_key_warning", "警告: ホストキーの検証が無効です!")
 	message.SetString(language.German, "host_key_warning", "WARNUNG: Host-Schlüssel-Verifikation ist deaktiviert!")
 	message.SetString(language.French, "host_key_warning", "AVERTISSEMENT: La vérification de la clé d'hôte est désactivée!")
-	
+
 	message.SetString(language.English, "using_key_auth", "Using public key authentication: %s")
 	message.SetString(language.Spanish, "using_key_auth", "Usando autenticación de clave pública: %s")
 	message.SetString(language.Chinese, "using_key_auth", "使用公钥认证: %s")
@@ -301,14 +306,14 @@ func registerMessages() {
 	message.SetString(language.Japanese, "using_key_auth", "公開鍵認証を使用: %s")
 	message.SetString(language.German, "using_key_auth", "Verwende öffentliche Schlüssel-Authentifizierung: %s")
 	message.SetString(language.French, "using_key_auth", "Utilisation de l'authentification par clé publique: %s")
-	
+
 	message.SetString(language.English, "key_auth_failed", "Failed to load private key: %v. Will attempt password auth.")
 	message.SetString(language.Spanish, "key_auth_failed", "Error cargando clave privada: %v. Se intentará autenticación por contraseña.")
-	
+
 	// Connection messages
 	message.SetString(language.English, "dial_via_tsnet", "Dialing %s via tsnet...")
 	message.SetString(language.Spanish, "dial_via_tsnet", "Conectando a %s vía tsnet...")
-	
+
 	message.SetString(language.English, "dial_failed", "Failed to dial %s via tsnet (is Tailscale connection up and host reachable?): %v")
 	message.SetString(language.Spanish, "dial_failed", "Error conectando a %s vía tsnet (¿está la conexión Tailscale activa y el servidor accesible?): %v")
 	message.SetString(language.Chinese, "dial_failed", "通过 tsnet 连接到 %s 失败（Tailscale 连接是否正常，主机是否可达？）: %v")
@@ -320,7 +325,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "dial_failed", "tsnet経由で%sへの接続に失敗 (Tailscale接続が有効でホストに到達可能ですか?): %v")
 	message.SetString(language.German, "dial_failed", "Verbindung zu %s über tsnet fehlgeschlagen (ist Tailscale-Verbindung aktiv und Host erreichbar?): %v")
 	message.SetString(language.French, "dial_failed", "Échec de la connexion à %s via tsnet (la connexion Tailscale est-elle active et l'hôte accessible?): %v")
-	
+
 	message.SetString(language.English, "ssh_connection_established", "SSH connection established.")
 	message.SetString(language.Spanish, "ssh_connection_established", "Conexión SSH establecida.")
 	message.SetString(language.Chinese, "ssh_connection_established", "SSH 连接已建立。")
@@ -332,7 +337,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "ssh_connection_established", "SSH接続が確立されました。")
 	message.SetString(language.German, "ssh_connection_established", "SSH-Verbindung hergestellt.")
 	message.SetString(language.French, "ssh_connection_established", "Connexion SSH établie.")
-	
+
 	message.SetString(language.English, "ssh_connection_failed", "Failed to establish SSH connection to %s: %v")
 	message.SetString(language.Spanish, "ssh_connection_failed", "Error estableciendo conexión SSH a %s: %v")
 	message.SetString(language.Chinese, "ssh_connection_failed", "建立到 %s 的 SSH 连接失败: %v")
@@ -344,13 +349,13 @@ func registerMessages() {
 	message.SetString(language.Japanese, "ssh_connection_failed", "%s へのSSH接続の確立に失敗: %v")
 	message.SetString(language.German, "ssh_connection_failed", "SSH-Verbindung zu %s fehlgeschlagen: %v")
 	message.SetString(language.French, "ssh_connection_failed", "Échec de l'établissement de la connexion SSH vers %s: %v")
-	
+
 	message.SetString(language.English, "ssh_auth_failed", "SSH Authentication failed for user %s: %v")
 	message.SetString(language.Spanish, "ssh_auth_failed", "Autenticación SSH falló para usuario %s: %v")
-	
+
 	message.SetString(language.English, "host_key_failed", "SSH Host key verification failed: %v")
 	message.SetString(language.Spanish, "host_key_failed", "Verificación de clave de servidor SSH falló: %v")
-	
+
 	message.SetString(language.English, "escape_sequence", "\nEscape sequence: ~. to terminate session")
 	message.SetString(language.Spanish, "escape_sequence", "\nSecuencia de escape: ~. para terminar sesión")
 	message.SetString(language.Chinese, "escape_sequence", "\n退出序列: ~. 终止会话")
@@ -362,10 +367,10 @@ func registerMessages() {
 	message.SetString(language.Japanese, "escape_sequence", "\nエスケープシーケンス: ~. セッションを終了")
 	message.SetString(language.German, "escape_sequence", "\nEscape-Sequenz: ~. zum Beenden der Sitzung")
 	message.SetString(language.French, "escape_sequence", "\nSéquence d'échappement: ~. pour terminer la session")
-	
+
 	message.SetString(language.English, "ssh_session_closed", "SSH session closed.")
 	message.SetString(language.Spanish, "ssh_session_closed", "Sesión SSH cerrada.")
-	
+
 	// Host list messages
 	message.SetString(language.English, "no_peers_found", "No Tailscale peers found")
 	message.SetString(language.Spanish, "no_peers_found", "No se encontraron pares Tailscale")
@@ -378,13 +383,13 @@ func registerMessages() {
 	message.SetString(language.Japanese, "no_peers_found", "Tailscaleピアが見つかりません")
 	message.SetString(language.German, "no_peers_found", "Keine Tailscale-Peers gefunden")
 	message.SetString(language.French, "no_peers_found", "Aucun pair Tailscale trouvé")
-	
+
 	message.SetString(language.English, "host_list_labels", "HOST,IP,STATUS,OS")
 	message.SetString(language.Spanish, "host_list_labels", "SERVIDOR,IP,ESTADO,SO")
-	
+
 	message.SetString(language.English, "host_list_separator", "----,--,------,--")
 	message.SetString(language.Spanish, "host_list_separator", "--------,--,------,--")
-	
+
 	message.SetString(language.English, "status_online", "ONLINE")
 	message.SetString(language.Spanish, "status_online", "EN LÍNEA")
 	message.SetString(language.Chinese, "status_online", "在线")
@@ -396,7 +401,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "status_online", "オンライン")
 	message.SetString(language.German, "status_online", "ONLINE")
 	message.SetString(language.French, "status_online", "EN LIGNE")
-	
+
 	message.SetString(language.English, "status_offline", "OFFLINE")
 	message.SetString(language.Spanish, "status_offline", "DESCONECTADO")
 	message.SetString(language.Chinese, "status_offline", "离线")
@@ -408,7 +413,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "status_offline", "オフライン")
 	message.SetString(language.German, "status_offline", "OFFLINE")
 	message.SetString(language.French, "status_offline", "HORS LIGNE")
-	
+
 	// Host picker messages
 	message.SetString(language.English, "no_online_hosts", "no online hosts found")
 	message.SetString(language.Spanish, "no_online_hosts", "no se encontraron servidores en línea")
@@ -421,7 +426,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "no_online_hosts", "オンラインのホストが見つかりません")
 	message.SetString(language.German, "no_online_hosts", "keine Online-Hosts gefunden")
 	message.SetString(language.French, "no_online_hosts", "aucun hôte en ligne trouvé")
-	
+
 	message.SetString(language.English, "available_hosts", "Available hosts:")
 	message.SetString(language.Spanish, "available_hosts", "Servidores disponibles:")
 	message.SetString(language.Chinese, "available_hosts", "可用主机:")
@@ -433,7 +438,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "available_hosts", "利用可能なホスト:")
 	message.SetString(language.German, "available_hosts", "Verfügbare Hosts:")
 	message.SetString(language.French, "available_hosts", "Hôtes disponibles:")
-	
+
 	message.SetString(language.English, "select_host", "\nSelect host (1-%d): ")
 	message.SetString(language.Spanish, "select_host", "\nSelecciona servidor (1-%d): ")
 	message.SetString(language.Chinese, "select_host", "\n选择主机 (1-%d): ")
@@ -445,7 +450,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "select_host", "\nホストを選択 (1-%d): ")
 	message.SetString(language.German, "select_host", "\nHost auswählen (1-%d): ")
 	message.SetString(language.French, "select_host", "\nSélectionner l'hôte (1-%d): ")
-	
+
 	message.SetString(language.English, "invalid_selection", "invalid selection")
 	message.SetString(language.Spanish, "invalid_selection", "selección inválida")
 	message.SetString(language.Chinese, "invalid_selection", "无效选择")
@@ -457,7 +462,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "invalid_selection", "無効な選択")
 	message.SetString(language.German, "invalid_selection", "ungültige Auswahl")
 	message.SetString(language.French, "invalid_selection", "sélection invalide")
-	
+
 	message.SetString(language.English, "selection_out_of_range", "selection out of range")
 	message.SetString(language.Spanish, "selection_out_of_range", "selección fuera de rango")
 	message.SetString(language.Chinese, "selection_out_of_range", "选择超出范围")
@@ -469,7 +474,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "selection_out_of_range", "選択が範囲外")
 	message.SetString(language.German, "selection_out_of_range", "Auswahl außerhalb des Bereichs")
 	message.SetString(language.French, "selection_out_of_range", "sélection hors plage")
-	
+
 	message.SetString(language.English, "connecting_to", "Connecting to %s...")
 	message.SetString(language.Spanish, "connecting_to", "Conectando a %s...")
 	message.SetString(language.Chinese, "connecting_to", "正在连接到 %s...")
@@ -481,23 +486,23 @@ func registerMessages() {
 	message.SetString(language.Japanese, "connecting_to", "%s に接続中...")
 	message.SetString(language.German, "connecting_to", "Verbindung zu %s...")
 	message.SetString(language.French, "connecting_to", "Connexion à %s...")
-	
+
 	// Multi-host operation messages
 	message.SetString(language.English, "no_hosts_specified", "no hosts specified")
 	message.SetString(language.Spanish, "no_hosts_specified", "no se especificaron servidores")
-	
+
 	message.SetString(language.English, "no_hosts_for_exec", "no hosts specified for --exec")
 	message.SetString(language.Spanish, "no_hosts_for_exec", "no se especificaron servidores para --exec")
-	
+
 	message.SetString(language.English, "invalid_copy_format", "invalid --copy format. Use: localfile host1,host2:/path/")
 	message.SetString(language.Spanish, "invalid_copy_format", "formato --copy inválido. Usar: archivo_local servidor1,servidor2:/ruta/")
-	
+
 	message.SetString(language.English, "invalid_remote_spec", "invalid remote specification. Must include path after ':'")
 	message.SetString(language.Spanish, "invalid_remote_spec", "especificación remota inválida. Debe incluir ruta después de ':'")
-	
+
 	message.SetString(language.English, "copying_to", "Copying %s to %s:%s...")
 	message.SetString(language.Spanish, "copying_to", "Copiando %s a %s:%s...")
-	
+
 	message.SetString(language.English, "copy_failed", "Failed to copy to %s: %v")
 	message.SetString(language.Spanish, "copy_failed", "Error copiando a %s: %v")
 	message.SetString(language.Chinese, "copy_failed", "复制到 %s 失败: %v")
@@ -509,7 +514,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "copy_failed", "%s への複写に失敗: %v")
 	message.SetString(language.German, "copy_failed", "Fehler beim Kopieren nach %s: %v")
 	message.SetString(language.French, "copy_failed", "Échec de la copie vers %s: %v")
-	
+
 	message.SetString(language.English, "copy_success", "Successfully copied to %s")
 	message.SetString(language.Spanish, "copy_success", "Copiado exitosamente a %s")
 	message.SetString(language.Chinese, "copy_success", "成功复制到 %s")
@@ -521,17 +526,17 @@ func registerMessages() {
 	message.SetString(language.Japanese, "copy_success", "%s への複写が成功しました")
 	message.SetString(language.German, "copy_success", "Erfolgreich nach %s kopiert")
 	message.SetString(language.French, "copy_success", "Copié avec succès vers %s")
-	
+
 	// SCP error messages
 	message.SetString(language.English, "invalid_scp_remote", "invalid remote SCP argument format: %q. Must be [user@]host:path")
 	message.SetString(language.Spanish, "invalid_scp_remote", "formato de argumento SCP remoto inválido: %q. Debe ser [usuario@]servidor:ruta")
-	
+
 	message.SetString(language.English, "invalid_user_host", "invalid user@host format in SCP argument: %q")
 	message.SetString(language.Spanish, "invalid_user_host", "formato usuario@servidor inválido en argumento SCP: %q")
-	
+
 	message.SetString(language.English, "empty_host_scp", "host cannot be empty in SCP argument: %q")
 	message.SetString(language.Spanish, "empty_host_scp", "el servidor no puede estar vacío en argumento SCP: %q")
-	
+
 	// Flag descriptions
 	message.SetString(language.English, "flag_lang_desc", "Language for CLI output (en, es, zh, hi, ar, bn, pt, ru, ja, de, fr)")
 	message.SetString(language.Spanish, "flag_lang_desc", "Idioma para salida CLI (en, es, zh, hi, ar, bn, pt, ru, ja, de, fr)")
@@ -544,119 +549,119 @@ func registerMessages() {
 	message.SetString(language.Japanese, "flag_lang_desc", "CLI出力の言語 (en, es, zh, hi, ar, bn, pt, ru, ja, de, fr)")
 	message.SetString(language.German, "flag_lang_desc", "Sprache für CLI-Ausgabe (en, es, zh, hi, ar, bn, pt, ru, ja, de, fr)")
 	message.SetString(language.French, "flag_lang_desc", "Langue pour la sortie CLI (en, es, zh, hi, ar, bn, pt, ru, ja, de, fr)")
-	
+
 	message.SetString(language.English, "flag_user_desc", "SSH Username")
 	message.SetString(language.Spanish, "flag_user_desc", "Nombre de usuario SSH")
-	
+
 	message.SetString(language.English, "flag_key_desc", "Path to SSH private key")
 	message.SetString(language.Spanish, "flag_key_desc", "Ruta a clave privada SSH")
-	
+
 	message.SetString(language.English, "flag_ssh_config_desc", "SSH configuration file")
 	message.SetString(language.Spanish, "flag_ssh_config_desc", "Archivo de configuración SSH")
-	
+
 	message.SetString(language.English, "flag_tsnet_desc", "Directory to store tsnet state")
 	message.SetString(language.Spanish, "flag_tsnet_desc", "Directorio para almacenar estado tsnet")
-	
+
 	message.SetString(language.English, "flag_control_desc", "Tailscale control plane URL (optional)")
 	message.SetString(language.Spanish, "flag_control_desc", "URL del plano de control Tailscale (opcional)")
-	
+
 	message.SetString(language.English, "flag_verbose_desc", "Verbose logging")
 	message.SetString(language.Spanish, "flag_verbose_desc", "Logging detallado")
-	
+
 	message.SetString(language.English, "flag_insecure_desc", "Disable host key checking (INSECURE!)")
 	message.SetString(language.Spanish, "flag_insecure_desc", "Deshabilitar verificación de clave de servidor (¡INSEGURO!)")
-	
+
 	message.SetString(language.English, "flag_force_insecure_desc", "Skip confirmation for insecure connections (automation only)")
 	message.SetString(language.Spanish, "flag_force_insecure_desc", "Omitir confirmación para conexiones inseguras (solo automatización)")
-	
+
 	message.SetString(language.English, "flag_forward_desc", "forward stdio to destination host:port (for use as ProxyCommand)")
 	message.SetString(language.Spanish, "flag_forward_desc", "reenviar stdio a servidor:puerto destino (para usar como ComandoProxy)")
-	
+
 	message.SetString(language.English, "flag_version_desc", "Print version and exit")
 	message.SetString(language.Spanish, "flag_version_desc", "Mostrar versión y salir")
-	
+
 	message.SetString(language.English, "flag_list_desc", "List available Tailscale hosts")
 	message.SetString(language.Spanish, "flag_list_desc", "Listar servidores Tailscale disponibles")
-	
+
 	message.SetString(language.English, "flag_multi_desc", "Start tmux session with multiple hosts (comma-separated)")
 	message.SetString(language.Spanish, "flag_multi_desc", "Iniciar sesión tmux con múltiples servidores (separados por comas)")
-	
+
 	message.SetString(language.English, "flag_exec_desc", "Execute command on specified hosts")
 	message.SetString(language.Spanish, "flag_exec_desc", "Ejecutar comando en servidores especificados")
-	
+
 	message.SetString(language.English, "flag_copy_desc", "Copy files to multiple hosts (format: localfile host1,host2:/path/)")
 	message.SetString(language.Spanish, "flag_copy_desc", "Copiar archivos a múltiples servidores (formato: archivo_local servidor1,servidor2:/ruta/)")
-	
+
 	message.SetString(language.English, "flag_pick_desc", "Interactive host picker (simple selection)")
 	message.SetString(language.Spanish, "flag_pick_desc", "Selector interactivo de servidores (selección simple)")
-	
+
 	message.SetString(language.English, "flag_parallel_desc", "Execute commands in parallel (use with --exec)")
 	message.SetString(language.Spanish, "flag_parallel_desc", "Ejecutar comandos en paralelo (usar con --exec)")
-	
+
 	// SCP-specific messages
 	message.SetString(language.English, "scp_enter_password", "Enter password for %s@%s (for SCP): ")
 	message.SetString(language.Spanish, "scp_enter_password", "Ingresa contraseña para %s@%s (para SCP): ")
-	
+
 	message.SetString(language.English, "scp_host_key_warning", "CLI SCP: WARNING! Host key verification is disabled!")
 	message.SetString(language.Spanish, "scp_host_key_warning", "CLI SCP: ¡ADVERTENCIA! ¡Verificación de clave de servidor deshabilitada!")
-	
+
 	message.SetString(language.English, "scp_empty_path", "local or remote path for SCP cannot be empty")
 	message.SetString(language.Spanish, "scp_empty_path", "la ruta local o remota para SCP no puede estar vacía")
-	
+
 	message.SetString(language.English, "scp_upload_complete", "CLI SCP: Upload complete.")
 	message.SetString(language.Spanish, "scp_upload_complete", "CLI SCP: Subida completada.")
-	
+
 	message.SetString(language.English, "scp_download_complete", "CLI SCP: Download complete.")
 	message.SetString(language.Spanish, "scp_download_complete", "CLI SCP: Descarga completada.")
-	
+
 	// Common error messages
 	message.SetString(language.English, "error_prefix", "Error: %v")
 	message.SetString(language.Spanish, "error_prefix", "Error: %v")
-	
+
 	message.SetString(language.English, "failed_read_user_input", "failed to read user input: %w")
 	message.SetString(language.Spanish, "failed_read_user_input", "error al leer entrada del usuario: %w")
-	
+
 	message.SetString(language.English, "hostname_cannot_be_empty", "hostname cannot be empty")
 	message.SetString(language.Spanish, "hostname_cannot_be_empty", "el nombre del servidor no puede estar vacío")
-	
+
 	message.SetString(language.English, "invalid_port_number", "invalid port number '%s': %w")
 	message.SetString(language.Spanish, "invalid_port_number", "número de puerto inválido '%s': %w")
-	
+
 	message.SetString(language.English, "invalid_host_port_format", "invalid host:port format '%s': %w")
 	message.SetString(language.Spanish, "invalid_host_port_format", "formato servidor:puerto inválido '%s': %w")
-	
+
 	// TTY and security messages
 	message.SetString(language.English, "not_running_in_terminal", "not running in a terminal")
 	message.SetString(language.Spanish, "not_running_in_terminal", "no se está ejecutando en una terminal")
-	
+
 	message.SetString(language.English, "tty_security_validation_failed", "TTY security validation failed: %w")
 	message.SetString(language.Spanish, "tty_security_validation_failed", "falló la validación de seguridad TTY: %w")
-	
+
 	message.SetString(language.English, "failed_open_tty", "failed to open TTY: %w")
 	message.SetString(language.Spanish, "failed_open_tty", "error al abrir TTY: %w")
-	
+
 	// Security warning messages for insecure mode
 	message.SetString(language.English, "warning_insecure_mode", "Host key verification disabled!")
 	message.SetString(language.Spanish, "warning_insecure_mode", "¡Verificación de clave de servidor deshabilitada!")
-	
+
 	message.SetString(language.English, "warning_mitm_vulnerability", "This makes you vulnerable to man-in-the-middle attacks.")
 	message.SetString(language.Spanish, "warning_mitm_vulnerability", "Esto te hace vulnerable a ataques de intermediario (man-in-the-middle).")
-	
+
 	message.SetString(language.English, "warning_trusted_networks_only", "Only use this in trusted network environments.")
 	message.SetString(language.Spanish, "warning_trusted_networks_only", "Solo usa esto en entornos de red confiables.")
-	
+
 	message.SetString(language.English, "insecure_mode_forced", "Insecure mode forced via --force-insecure flag.")
 	message.SetString(language.Spanish, "insecure_mode_forced", "Modo inseguro forzado mediante flag --force-insecure.")
-	
+
 	message.SetString(language.English, "confirm_insecure_connection", "Continue with insecure connection? [y/N]:")
 	message.SetString(language.Spanish, "confirm_insecure_connection", "¿Continuar con conexión insegura? [y/N]:")
-	
+
 	message.SetString(language.English, "connection_cancelled_by_user", "connection cancelled by user")
 	message.SetString(language.Spanish, "connection_cancelled_by_user", "conexión cancelada por el usuario")
-	
+
 	message.SetString(language.English, "proceeding_with_insecure_connection", "Proceeding with insecure connection...")
 	message.SetString(language.Spanish, "proceeding_with_insecure_connection", "Procediendo con conexión insegura...")
-	
+
 	// CLI command descriptions for fang
 	message.SetString(language.English, "cli_description", "Secure SSH/SCP client with Tailscale connectivity for enterprise environments")
 	message.SetString(language.Spanish, "cli_description", "Cliente SSH/SCP seguro con conectividad Tailscale para entornos empresariales")
@@ -669,7 +674,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "cli_description", "企業環境向けTailscale接続対応セキュアSSH/SCPクライアント")
 	message.SetString(language.German, "cli_description", "Sicherer SSH/SCP-Client mit Tailscale-Konnektivität für Unternehmensumgebungen")
 	message.SetString(language.French, "cli_description", "Client SSH/SCP sécurisé avec connectivité Tailscale pour environnements d'entreprise")
-	
+
 	message.SetString(language.English, "cmd_connect_desc", "Connect to a remote host via SSH (default command)")
 	message.SetString(language.Spanish, "cmd_connect_desc", "Conectar a un servidor remoto via SSH (comando por defecto)")
 	message.SetString(language.Chinese, "cmd_connect_desc", "通过 SSH 连接到远程主机（默认命令）")
@@ -681,7 +686,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "cmd_connect_desc", "SSH経由でリモートホストに接続（デフォルトコマンド）")
 	message.SetString(language.German, "cmd_connect_desc", "Verbindung zu einem Remote-Host über SSH (Standardbefehl)")
 	message.SetString(language.French, "cmd_connect_desc", "Se connecter à un hôte distant via SSH (commande par défaut)")
-	
+
 	message.SetString(language.English, "cmd_scp_desc", "Transfer files securely using SCP")
 	message.SetString(language.Spanish, "cmd_scp_desc", "Transferir archivos de forma segura usando SCP")
 	message.SetString(language.Chinese, "cmd_scp_desc", "使用 SCP 安全传输文件")
@@ -693,7 +698,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "cmd_scp_desc", "SCPを使用したセキュアファイル転送")
 	message.SetString(language.German, "cmd_scp_desc", "Dateien sicher mit SCP übertragen")
 	message.SetString(language.French, "cmd_scp_desc", "Transférer des fichiers en toute sécurité avec SCP")
-	
+
 	message.SetString(language.English, "cmd_list_desc", "List available Tailscale hosts")
 	message.SetString(language.Spanish, "cmd_list_desc", "Listar servidores Tailscale disponibles")
 	message.SetString(language.Chinese, "cmd_list_desc", "列出可用的 Tailscale 主机")
@@ -705,7 +710,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "cmd_list_desc", "利用可能なTailscaleホストを一覧表示")
 	message.SetString(language.German, "cmd_list_desc", "Verfügbare Tailscale-Hosts auflisten")
 	message.SetString(language.French, "cmd_list_desc", "Lister les hôtes Tailscale disponibles")
-	
+
 	message.SetString(language.English, "cmd_exec_desc", "Execute commands on multiple hosts")
 	message.SetString(language.Spanish, "cmd_exec_desc", "Ejecutar comandos en múltiples servidores")
 	message.SetString(language.Chinese, "cmd_exec_desc", "在多个主机上执行命令")
@@ -717,7 +722,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "cmd_exec_desc", "複数のホストでコマンドを実行")
 	message.SetString(language.German, "cmd_exec_desc", "Befehle auf mehreren Hosts ausführen")
 	message.SetString(language.French, "cmd_exec_desc", "Exécuter des commandes sur plusieurs hôtes")
-	
+
 	message.SetString(language.English, "cmd_multi_desc", "Multi-host operations with tmux session management")
 	message.SetString(language.Spanish, "cmd_multi_desc", "Operaciones multi-servidor con gestión de sesiones tmux")
 	message.SetString(language.Chinese, "cmd_multi_desc", "使用 tmux 会话管理的多主机操作")
@@ -729,7 +734,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "cmd_multi_desc", "tmuxセッション管理を伴ったマルチホスト操作")
 	message.SetString(language.German, "cmd_multi_desc", "Multi-Host-Operationen mit tmux-Sitzungsverwaltung")
 	message.SetString(language.French, "cmd_multi_desc", "Opérations multi-hôtes avec gestion de session tmux")
-	
+
 	message.SetString(language.English, "cmd_config_desc", "Manage application configuration")
 	message.SetString(language.Spanish, "cmd_config_desc", "Gestionar configuración de la aplicación")
 	message.SetString(language.Chinese, "cmd_config_desc", "管理应用程序配置")
@@ -741,7 +746,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "cmd_config_desc", "アプリケーション設定の管理")
 	message.SetString(language.German, "cmd_config_desc", "Anwendungskonfiguration verwalten")
 	message.SetString(language.French, "cmd_config_desc", "Gérer la configuration de l'application")
-	
+
 	message.SetString(language.English, "cmd_pqc_desc", "Post-quantum cryptography operations and reporting")
 	message.SetString(language.Spanish, "cmd_pqc_desc", "Operaciones y reportes de criptografía post-cuántica")
 	message.SetString(language.Chinese, "cmd_pqc_desc", "后量子密码学操作和报告")
@@ -753,7 +758,7 @@ func registerMessages() {
 	message.SetString(language.Japanese, "cmd_pqc_desc", "ポスト量子暗号の操作とレポート")
 	message.SetString(language.German, "cmd_pqc_desc", "Post-Quanten-Kryptographie-Operationen und Berichte")
 	message.SetString(language.French, "cmd_pqc_desc", "Opérations et rapports de cryptographie post-quantique")
-	
+
 	message.SetString(language.English, "cmd_version_desc", "Show version information")
 	message.SetString(language.Spanish, "cmd_version_desc", "Mostrar información de versión")
 	message.SetString(language.Chinese, "cmd_version_desc", "显示版本信息")
@@ -919,6 +924,62 @@ func registerMessages() {
   
   # Redirection de port
   ts-ssh connect -W destination:port hostname`)
+	message.SetString(language.Spanish, "connect_examples", `  # Conexión simple
+  ts-ssh connect usuario@servidor
+  
+  # Ejecutar comando remoto
+  ts-ssh connect servidor "uptime"
+  
+  # Redirección de puertos
+  ts-ssh connect -W destino:puerto servidor`)
+	message.SetString(language.Hindi, "connect_examples", `  # सरल कनेक्शन
+  ts-ssh connect उपयोगकर्ता@होस्टनाम
+  
+  # रिमोट कमांड चलाएं
+  ts-ssh connect होस्टनाम "uptime"
+  
+  # पोर्ट फॉरवर्डिंग
+  ts-ssh connect -W गंतव्य:पोर्ट होस्टनाम`)
+	message.SetString(language.Arabic, "connect_examples", `  # اتصال بسيط
+  ts-ssh connect مستخدم@اسم_المضيف
+  
+  # تنفيذ أمر عن بُعد
+  ts-ssh connect اسم_المضيف "uptime"
+  
+  # إعادة توجيه المنفذ
+  ts-ssh connect -W وجهة:منفذ اسم_المضيف`)
+	message.SetString(language.Bengali, "connect_examples", `  # সরল সংযোগ
+  ts-ssh connect ব্যবহারকারী@হোস্টনাম
+  
+  # দূরবর্তী কমান্ড চালান
+  ts-ssh connect হোস্টনাম "uptime"
+  
+  # পোর্ট ফরওয়ার্ডিং
+  ts-ssh connect -W গন্তব্য:পোর্ট হোস্টনাম`)
+	message.SetString(language.Portuguese, "connect_examples", `  # Conexão simples
+  ts-ssh connect usuário@hostname
+  
+  # Executar comando remoto
+  ts-ssh connect hostname "uptime"
+  
+  # Redirecionamento de porta
+  ts-ssh connect -W destino:porta hostname`)
+	message.SetString(language.Russian, "connect_examples", `  # Простое подключение
+  ts-ssh connect пользователь@хост
+  
+  # Выполнить удаленную команду
+  ts-ssh connect хост "uptime"
+  
+  # Перенаправление портов
+  ts-ssh connect -W назначение:порт хост`)
+	message.SetString(language.Japanese, "connect_examples", `  # シンプルな接続
+  ts-ssh connect ユーザー@ホスト名
+  
+  # リモートコマンドの実行
+  ts-ssh connect ホスト名 "uptime"
+  
+  # ポート転送
+  ts-ssh connect -W 宛先:ポート ホスト名`)
 
 	// SCP command
 	message.SetString(language.English, "scp_short", "Copy files via SCP")
@@ -1433,6 +1494,275 @@ func registerMessages() {
 	message.SetString(language.Chinese, "flag_pqc_level_help", "PQC 级别: 0=无, 1=混合, 2=严格")
 	message.SetString(language.German, "flag_pqc_level_help", "PQC-Level: 0=keine, 1=hybrid, 2=strikt")
 	message.SetString(language.French, "flag_pqc_level_help", "Niveau PQC: 0=aucun, 1=hybride, 2=strict")
+
+	// Connection status messages
+	message.SetString(language.English, "starting_tailscale_connection", "Starting Tailscale connection...")
+	message.SetString(language.Spanish, "starting_tailscale_connection", "Iniciando conexión Tailscale...")
+	message.SetString(language.Chinese, "starting_tailscale_connection", "正在启动 Tailscale 连接...")
+	message.SetString(language.Hindi, "starting_tailscale_connection", "Tailscale कनेक्शन शुरू कर रहे हैं...")
+	message.SetString(language.Arabic, "starting_tailscale_connection", "بدء الاتصال بـ Tailscale...")
+	message.SetString(language.Bengali, "starting_tailscale_connection", "Tailscale সংযোগ শুরু করা হচ্ছে...")
+	message.SetString(language.Portuguese, "starting_tailscale_connection", "Iniciando conexão Tailscale...")
+	message.SetString(language.Russian, "starting_tailscale_connection", "Запуск подключения Tailscale...")
+	message.SetString(language.Japanese, "starting_tailscale_connection", "Tailscale接続を開始しています...")
+	message.SetString(language.German, "starting_tailscale_connection", "Tailscale-Verbindung wird gestartet...")
+	message.SetString(language.French, "starting_tailscale_connection", "Démarrage de la connexion Tailscale...")
+
+	message.SetString(language.English, "to_authenticate_visit", "To authenticate, visit:")
+	message.SetString(language.Spanish, "to_authenticate_visit", "Para autenticarse, visite:")
+	message.SetString(language.Chinese, "to_authenticate_visit", "要进行身份验证，请访问:")
+	message.SetString(language.Hindi, "to_authenticate_visit", "प्रमाणीकरण के लिए, यहाँ जाएँ:")
+	message.SetString(language.Arabic, "to_authenticate_visit", "للمصادقة، تفضل بزيارة:")
+	message.SetString(language.Bengali, "to_authenticate_visit", "প্রমাণীকরণের জন্য, এখানে যান:")
+	message.SetString(language.Portuguese, "to_authenticate_visit", "Para autenticar, visite:")
+	message.SetString(language.Russian, "to_authenticate_visit", "Для аутентификации перейдите по адресу:")
+	message.SetString(language.Japanese, "to_authenticate_visit", "認証するには、次のアドレスにアクセスしてください:")
+	message.SetString(language.German, "to_authenticate_visit", "Zur Authentifizierung besuchen Sie:")
+	message.SetString(language.French, "to_authenticate_visit", "Pour vous authentifier, visitez:")
+
+	// Error messages
+	message.SetString(language.English, "target_hostname_required", "target hostname required")
+	message.SetString(language.Spanish, "target_hostname_required", "se requiere nombre de host de destino")
+	message.SetString(language.Chinese, "target_hostname_required", "需要目标主机名")
+	message.SetString(language.Hindi, "target_hostname_required", "लक्ष्य होस्टनाम आवश्यक है")
+	message.SetString(language.Arabic, "target_hostname_required", "اسم المضيف المستهدف مطلوب")
+	message.SetString(language.Bengali, "target_hostname_required", "লক্ষ্য হোস্টনাম প্রয়োজন")
+	message.SetString(language.Portuguese, "target_hostname_required", "nome do host de destino obrigatório")
+	message.SetString(language.Russian, "target_hostname_required", "требуется имя целевого хоста")
+	message.SetString(language.Japanese, "target_hostname_required", "ターゲットホスト名が必要です")
+	message.SetString(language.German, "target_hostname_required", "Ziel-Hostname erforderlich")
+	message.SetString(language.French, "target_hostname_required", "nom d'hôte cible requis")
+
+	message.SetString(language.English, "failed_to_apply_defaults", "failed to apply defaults")
+	message.SetString(language.Spanish, "failed_to_apply_defaults", "error al aplicar valores predeterminados")
+	message.SetString(language.Chinese, "failed_to_apply_defaults", "应用默认值失败")
+	message.SetString(language.Hindi, "failed_to_apply_defaults", "डिफ़ॉल्ट लागू करने में विफल")
+	message.SetString(language.Arabic, "failed_to_apply_defaults", "فشل في تطبيق القيم الافتراضية")
+	message.SetString(language.Bengali, "failed_to_apply_defaults", "ডিফল্ট প্রয়োগ করতে ব্যর্থ")
+	message.SetString(language.Portuguese, "failed_to_apply_defaults", "falha ao aplicar padrões")
+	message.SetString(language.Russian, "failed_to_apply_defaults", "не удалось применить значения по умолчанию")
+	message.SetString(language.Japanese, "failed_to_apply_defaults", "デフォルトの適用に失敗しました")
+	message.SetString(language.German, "failed_to_apply_defaults", "Anwenden der Standardwerte fehlgeschlagen")
+	message.SetString(language.French, "failed_to_apply_defaults", "échec de l'application des valeurs par défaut")
+
+	message.SetString(language.English, "no_host_selected", "no host selected")
+	message.SetString(language.Spanish, "no_host_selected", "ningún host seleccionado")
+	message.SetString(language.Chinese, "no_host_selected", "未选择主机")
+	message.SetString(language.Hindi, "no_host_selected", "कोई होस्ट चयनित नहीं")
+	message.SetString(language.Arabic, "no_host_selected", "لم يتم اختيار مضيف")
+	message.SetString(language.Bengali, "no_host_selected", "কোন হোস্ট নির্বাচিত নয়")
+	message.SetString(language.Portuguese, "no_host_selected", "nenhum host selecionado")
+	message.SetString(language.Russian, "no_host_selected", "хост не выбран")
+	message.SetString(language.Japanese, "no_host_selected", "ホストが選択されていません")
+	message.SetString(language.German, "no_host_selected", "kein Host ausgewählt")
+	message.SetString(language.French, "no_host_selected", "aucun hôte sélectionné")
+
+	// Security TTY messages
+	message.SetString(language.English, "tty_path_validation_failed", "TTY path validation failed")
+	message.SetString(language.Spanish, "tty_path_validation_failed", "Error en la validación de la ruta TTY")
+	message.SetString(language.Chinese, "tty_path_validation_failed", "TTY路径验证失败")
+	message.SetString(language.Hindi, "tty_path_validation_failed", "TTY पथ सत्यापन विफल")
+	message.SetString(language.Arabic, "tty_path_validation_failed", "فشل التحقق من مسار TTY")
+	message.SetString(language.Bengali, "tty_path_validation_failed", "TTY পথ যাচাইকরণ ব্যর্থ")
+	message.SetString(language.Portuguese, "tty_path_validation_failed", "Falha na validação do caminho TTY")
+	message.SetString(language.Russian, "tty_path_validation_failed", "Ошибка проверки пути TTY")
+	message.SetString(language.Japanese, "tty_path_validation_failed", "TTYパスの検証に失敗しました")
+	message.SetString(language.German, "tty_path_validation_failed", "TTY-Pfad-Validierung fehlgeschlagen")
+	message.SetString(language.French, "tty_path_validation_failed", "échec de validation du chemin TTY")
+
+	message.SetString(language.English, "tty_ownership_check_failed", "TTY ownership check failed")
+	message.SetString(language.Spanish, "tty_ownership_check_failed", "Error en la verificación de propiedad TTY")
+	message.SetString(language.Chinese, "tty_ownership_check_failed", "TTY所有权检查失败")
+	message.SetString(language.Hindi, "tty_ownership_check_failed", "TTY स्वामित्व जाँच विफल")
+	message.SetString(language.Arabic, "tty_ownership_check_failed", "فشل فحص ملكية TTY")
+	message.SetString(language.Bengali, "tty_ownership_check_failed", "TTY মালিকানা পরীক্ষা ব্যর্থ")
+	message.SetString(language.Portuguese, "tty_ownership_check_failed", "Falha na verificação de propriedade TTY")
+	message.SetString(language.Russian, "tty_ownership_check_failed", "Ошибка проверки владения TTY")
+	message.SetString(language.Japanese, "tty_ownership_check_failed", "TTY所有権チェックに失敗しました")
+	message.SetString(language.German, "tty_ownership_check_failed", "TTY-Eigentümerschaftsprüfung fehlgeschlagen")
+	message.SetString(language.French, "tty_ownership_check_failed", "échec de vérification de propriété TTY")
+
+	message.SetString(language.English, "tty_permission_check_failed", "TTY permission check failed")
+	message.SetString(language.Spanish, "tty_permission_check_failed", "Error en la verificación de permisos TTY")
+	message.SetString(language.Chinese, "tty_permission_check_failed", "TTY权限检查失败")
+	message.SetString(language.Hindi, "tty_permission_check_failed", "TTY अनुमति जाँच विफल")
+	message.SetString(language.Arabic, "tty_permission_check_failed", "فشل فحص صلاحية TTY")
+	message.SetString(language.Bengali, "tty_permission_check_failed", "TTY অনুমতি পরীক্ষা ব্যর্থ")
+	message.SetString(language.Portuguese, "tty_permission_check_failed", "Falha na verificação de permissão TTY")
+	message.SetString(language.Russian, "tty_permission_check_failed", "Ошибка проверки разрешений TTY")
+	message.SetString(language.Japanese, "tty_permission_check_failed", "TTY権限チェックに失敗しました")
+	message.SetString(language.German, "tty_permission_check_failed", "TTY-Berechtigungsprüfung fehlgeschlagen")
+	message.SetString(language.French, "tty_permission_check_failed", "échec de vérification des permissions TTY")
+
+	message.SetString(language.English, "not_running_in_terminal", "not running in terminal")
+	message.SetString(language.Spanish, "not_running_in_terminal", "no se ejecuta en terminal")
+	message.SetString(language.Chinese, "not_running_in_terminal", "未在终端中运行")
+	message.SetString(language.Hindi, "not_running_in_terminal", "टर्मिनल में नहीं चल रहा")
+	message.SetString(language.Arabic, "not_running_in_terminal", "لا يعمل في المحطة الطرفية")
+	message.SetString(language.Bengali, "not_running_in_terminal", "টার্মিনালে চলছে না")
+	message.SetString(language.Portuguese, "not_running_in_terminal", "não está executando no terminal")
+	message.SetString(language.Russian, "not_running_in_terminal", "не работает в терминале")
+	message.SetString(language.Japanese, "not_running_in_terminal", "ターミナルで実行されていません")
+	message.SetString(language.German, "not_running_in_terminal", "läuft nicht im Terminal")
+	message.SetString(language.French, "not_running_in_terminal", "ne fonctionne pas dans le terminal")
+
+	message.SetString(language.English, "tty_security_validation_failed", "TTY security validation failed")
+	message.SetString(language.Spanish, "tty_security_validation_failed", "Error en la validación de seguridad TTY")
+	message.SetString(language.Chinese, "tty_security_validation_failed", "TTY安全验证失败")
+	message.SetString(language.Hindi, "tty_security_validation_failed", "TTY सुरक्षा सत्यापन विफल")
+	message.SetString(language.Arabic, "tty_security_validation_failed", "فشل التحقق من أمان TTY")
+	message.SetString(language.Bengali, "tty_security_validation_failed", "TTY নিরাপত্তা যাচাইকরণ ব্যর্থ")
+	message.SetString(language.Portuguese, "tty_security_validation_failed", "Falha na validação de segurança TTY")
+	message.SetString(language.Russian, "tty_security_validation_failed", "Ошибка проверки безопасности TTY")
+	message.SetString(language.Japanese, "tty_security_validation_failed", "TTYセキュリティ検証に失敗しました")
+	message.SetString(language.German, "tty_security_validation_failed", "TTY-Sicherheitsvalidierung fehlgeschlagen")
+	message.SetString(language.French, "tty_security_validation_failed", "échec de validation de sécurité TTY")
+
+	message.SetString(language.English, "failed_open_tty", "failed to open TTY")
+	message.SetString(language.Spanish, "failed_open_tty", "error al abrir TTY")
+	message.SetString(language.Chinese, "failed_open_tty", "无法打开TTY")
+	message.SetString(language.Hindi, "failed_open_tty", "TTY खोलने में विफल")
+	message.SetString(language.Arabic, "failed_open_tty", "فشل فتح TTY")
+	message.SetString(language.Bengali, "failed_open_tty", "TTY খুলতে ব্যর্থ")
+	message.SetString(language.Portuguese, "failed_open_tty", "falha ao abrir TTY")
+	message.SetString(language.Russian, "failed_open_tty", "не удалось открыть TTY")
+	message.SetString(language.Japanese, "failed_open_tty", "TTYを開くことができませんでした")
+	message.SetString(language.German, "failed_open_tty", "TTY konnte nicht geöffnet werden")
+	message.SetString(language.French, "failed_open_tty", "échec d'ouverture TTY")
+
+	// SSH connection messages
+	message.SetString(language.English, "host_key_warning", "WARNING: Host key verification is disabled")
+	message.SetString(language.Spanish, "host_key_warning", "ADVERTENCIA: La verificación de clave de host está deshabilitada")
+	message.SetString(language.Chinese, "host_key_warning", "警告：主机密钥验证已禁用")
+	message.SetString(language.Hindi, "host_key_warning", "चेतावनी: होस्ट की सत्यापन अक्षम है")
+	message.SetString(language.Arabic, "host_key_warning", "تحذير: تحقق مفتاح المضيف معطل")
+	message.SetString(language.Bengali, "host_key_warning", "সতর্কতা: হোস্ট কী যাচাইকরণ অক্ষম")
+	message.SetString(language.Portuguese, "host_key_warning", "AVISO: A verificação da chave do host está desabilitada")
+	message.SetString(language.Russian, "host_key_warning", "ПРЕДУПРЕЖДЕНИЕ: Проверка ключа хоста отключена")
+	message.SetString(language.Japanese, "host_key_warning", "警告：ホストキーの検証が無効になっています")
+	message.SetString(language.German, "host_key_warning", "WARNUNG: Host-Schlüssel-Überprüfung ist deaktiviert")
+	message.SetString(language.French, "host_key_warning", "AVERTISSEMENT : La vérification de la clé d'hôte est désactivée")
+
+	message.SetString(language.English, "dial_via_tsnet", "Connecting via tsnet...")
+	message.SetString(language.Spanish, "dial_via_tsnet", "Conectando vía tsnet...")
+	message.SetString(language.Chinese, "dial_via_tsnet", "通过tsnet连接中...")
+	message.SetString(language.Hindi, "dial_via_tsnet", "tsnet के माध्यम से कनेक्ट हो रहा है...")
+	message.SetString(language.Arabic, "dial_via_tsnet", "الاتصال عبر tsnet...")
+	message.SetString(language.Bengali, "dial_via_tsnet", "tsnet এর মাধ্যমে সংযোগ করা হচ্ছে...")
+	message.SetString(language.Portuguese, "dial_via_tsnet", "Conectando via tsnet...")
+	message.SetString(language.Russian, "dial_via_tsnet", "Подключение через tsnet...")
+	message.SetString(language.Japanese, "dial_via_tsnet", "tsnet経由で接続中...")
+	message.SetString(language.German, "dial_via_tsnet", "Verbindung über tsnet...")
+	message.SetString(language.French, "dial_via_tsnet", "Connexion via tsnet...")
+
+	message.SetString(language.English, "ssh_handshake", "Performing SSH handshake...")
+	message.SetString(language.Spanish, "ssh_handshake", "Realizando protocolo SSH...")
+	message.SetString(language.Chinese, "ssh_handshake", "正在执行SSH握手...")
+	message.SetString(language.Hindi, "ssh_handshake", "SSH हैंडशेक कर रहा है...")
+	message.SetString(language.Arabic, "ssh_handshake", "إجراء مصافحة SSH...")
+	message.SetString(language.Bengali, "ssh_handshake", "SSH হ্যান্ডশেক সম্পাদন করা হচ্ছে...")
+	message.SetString(language.Portuguese, "ssh_handshake", "Realizando handshake SSH...")
+	message.SetString(language.Russian, "ssh_handshake", "Выполнение рукопожатия SSH...")
+	message.SetString(language.Japanese, "ssh_handshake", "SSHハンドシェイクを実行中...")
+	message.SetString(language.German, "ssh_handshake", "SSH-Handshake wird durchgeführt...")
+	message.SetString(language.French, "ssh_handshake", "Exécution de la poignée de main SSH...")
+
+	message.SetString(language.English, "dial_failed", "connection failed")
+	message.SetString(language.Spanish, "dial_failed", "conexión falló")
+	message.SetString(language.Chinese, "dial_failed", "连接失败")
+	message.SetString(language.Hindi, "dial_failed", "कनेक्शन विफल")
+	message.SetString(language.Arabic, "dial_failed", "فشل الاتصال")
+	message.SetString(language.Bengali, "dial_failed", "সংযোগ ব্যর্থ")
+	message.SetString(language.Portuguese, "dial_failed", "conexão falhou")
+	message.SetString(language.Russian, "dial_failed", "соединение не удалось")
+	message.SetString(language.Japanese, "dial_failed", "接続に失敗しました")
+	message.SetString(language.German, "dial_failed", "Verbindung fehlgeschlagen")
+	message.SetString(language.French, "dial_failed", "échec de connexion")
+
+	message.SetString(language.English, "ssh_connection_failed", "SSH connection failed")
+	message.SetString(language.Spanish, "ssh_connection_failed", "Conexión SSH falló")
+	message.SetString(language.Chinese, "ssh_connection_failed", "SSH连接失败")
+	message.SetString(language.Hindi, "ssh_connection_failed", "SSH कनेक्शन विफल")
+	message.SetString(language.Arabic, "ssh_connection_failed", "فشل اتصال SSH")
+	message.SetString(language.Bengali, "ssh_connection_failed", "SSH সংযোগ ব্যর্থ")
+	message.SetString(language.Portuguese, "ssh_connection_failed", "Conexão SSH falhou")
+	message.SetString(language.Russian, "ssh_connection_failed", "SSH соединение не удалось")
+	message.SetString(language.Japanese, "ssh_connection_failed", "SSH接続に失敗しました")
+	message.SetString(language.German, "ssh_connection_failed", "SSH-Verbindung fehlgeschlagen")
+	message.SetString(language.French, "ssh_connection_failed", "échec de connexion SSH")
+
+	message.SetString(language.English, "ssh_connection_established", "SSH connection established")
+	message.SetString(language.Spanish, "ssh_connection_established", "Conexión SSH establecida")
+	message.SetString(language.Chinese, "ssh_connection_established", "SSH连接已建立")
+	message.SetString(language.Hindi, "ssh_connection_established", "SSH कनेक्शन स्थापित")
+	message.SetString(language.Arabic, "ssh_connection_established", "تم تأسيس اتصال SSH")
+	message.SetString(language.Bengali, "ssh_connection_established", "SSH সংযোগ প্রতিষ্ঠিত")
+	message.SetString(language.Portuguese, "ssh_connection_established", "Conexão SSH estabelecida")
+	message.SetString(language.Russian, "ssh_connection_established", "SSH соединение установлено")
+	message.SetString(language.Japanese, "ssh_connection_established", "SSH接続が確立されました")
+	message.SetString(language.German, "ssh_connection_established", "SSH-Verbindung hergestellt")
+	message.SetString(language.French, "ssh_connection_established", "Connexion SSH établie")
+
+	// SCP operation messages
+	message.SetString(language.English, "scp_empty_path", "SCP path cannot be empty")
+	message.SetString(language.Spanish, "scp_empty_path", "La ruta SCP no puede estar vacía")
+	message.SetString(language.Chinese, "scp_empty_path", "SCP路径不能为空")
+	message.SetString(language.Hindi, "scp_empty_path", "SCP पथ खाली नहीं हो सकता")
+	message.SetString(language.Arabic, "scp_empty_path", "مسار SCP لا يمكن أن يكون فارغاً")
+	message.SetString(language.Bengali, "scp_empty_path", "SCP পথ খালি থাকতে পারে না")
+	message.SetString(language.Portuguese, "scp_empty_path", "O caminho SCP não pode estar vazio")
+	message.SetString(language.Russian, "scp_empty_path", "Путь SCP не может быть пустым")
+	message.SetString(language.Japanese, "scp_empty_path", "SCPパスは空にできません")
+	message.SetString(language.German, "scp_empty_path", "SCP-Pfad darf nicht leer sein")
+	message.SetString(language.French, "scp_empty_path", "Le chemin SCP ne peut pas être vide")
+
+	message.SetString(language.English, "scp_enter_password", "Enter password for %s@%s: ")
+	message.SetString(language.Spanish, "scp_enter_password", "Ingrese contraseña para %s@%s: ")
+	message.SetString(language.Chinese, "scp_enter_password", "为 %s@%s 输入密码: ")
+	message.SetString(language.Hindi, "scp_enter_password", "%s@%s के लिए पासवर्ड दर्ज करें: ")
+	message.SetString(language.Arabic, "scp_enter_password", "أدخل كلمة المرور لـ %s@%s: ")
+	message.SetString(language.Bengali, "scp_enter_password", "%s@%s এর জন্য পাসওয়ার্ড লিখুন: ")
+	message.SetString(language.Portuguese, "scp_enter_password", "Digite a senha para %s@%s: ")
+	message.SetString(language.Russian, "scp_enter_password", "Введите пароль для %s@%s: ")
+	message.SetString(language.Japanese, "scp_enter_password", "%s@%s のパスワードを入力してください: ")
+	message.SetString(language.German, "scp_enter_password", "Passwort für %s@%s eingeben: ")
+	message.SetString(language.French, "scp_enter_password", "Entrez le mot de passe pour %s@%s: ")
+
+	message.SetString(language.English, "scp_host_key_warning", "WARNING: SCP host key verification disabled")
+	message.SetString(language.Spanish, "scp_host_key_warning", "ADVERTENCIA: Verificación de clave de host SCP deshabilitada")
+	message.SetString(language.Chinese, "scp_host_key_warning", "警告：SCP主机密钥验证已禁用")
+	message.SetString(language.Hindi, "scp_host_key_warning", "चेतावनी: SCP होस्ट की सत्यापन अक्षम")
+	message.SetString(language.Arabic, "scp_host_key_warning", "تحذير: تحقق مفتاح مضيف SCP معطل")
+	message.SetString(language.Bengali, "scp_host_key_warning", "সতর্কতা: SCP হোস্ট কী যাচাইকরণ অক্ষম")
+	message.SetString(language.Portuguese, "scp_host_key_warning", "AVISO: Verificação de chave de host SCP desabilitada")
+	message.SetString(language.Russian, "scp_host_key_warning", "ПРЕДУПРЕЖДЕНИЕ: Проверка ключа хоста SCP отключена")
+	message.SetString(language.Japanese, "scp_host_key_warning", "警告：SCPホストキーの検証が無効になっています")
+	message.SetString(language.German, "scp_host_key_warning", "WARNUNG: SCP-Host-Schlüssel-Überprüfung ist deaktiviert")
+	message.SetString(language.French, "scp_host_key_warning", "AVERTISSEMENT : La vérification de la clé d'hôte SCP est désactivée")
+
+	message.SetString(language.English, "scp_upload_complete", "Upload complete")
+	message.SetString(language.Spanish, "scp_upload_complete", "Carga completada")
+	message.SetString(language.Chinese, "scp_upload_complete", "上传完成")
+	message.SetString(language.Hindi, "scp_upload_complete", "अपलोड पूर्ण")
+	message.SetString(language.Arabic, "scp_upload_complete", "اكتمل الرفع")
+	message.SetString(language.Bengali, "scp_upload_complete", "আপলোড সম্পন্ন")
+	message.SetString(language.Portuguese, "scp_upload_complete", "Upload concluído")
+	message.SetString(language.Russian, "scp_upload_complete", "Загрузка завершена")
+	message.SetString(language.Japanese, "scp_upload_complete", "アップロード完了")
+	message.SetString(language.German, "scp_upload_complete", "Upload abgeschlossen")
+	message.SetString(language.French, "scp_upload_complete", "Téléchargement terminé")
+
+	message.SetString(language.English, "scp_download_complete", "Download complete")
+	message.SetString(language.Spanish, "scp_download_complete", "Descarga completada")
+	message.SetString(language.Chinese, "scp_download_complete", "下载完成")
+	message.SetString(language.Hindi, "scp_download_complete", "डाउनलोड पूर्ण")
+	message.SetString(language.Arabic, "scp_download_complete", "اكتمل التنزيل")
+	message.SetString(language.Bengali, "scp_download_complete", "ডাউনলোড সম্পন্ন")
+	message.SetString(language.Portuguese, "scp_download_complete", "Download concluído")
+	message.SetString(language.Russian, "scp_download_complete", "Загрузка завершена")
+	message.SetString(language.Japanese, "scp_download_complete", "ダウンロード完了")
+	message.SetString(language.German, "scp_download_complete", "Download abgeschlossen")
+	message.SetString(language.French, "scp_download_complete", "Téléchargement terminé")
 }
 
 // T returns a localized string using the global printer thread-safely
@@ -1441,7 +1771,7 @@ func T(key string, args ...interface{}) string {
 	printerMu.RLock()
 	p := printer
 	printerMu.RUnlock()
-	
+
 	// Initialize if not yet done
 	if p == nil {
 		initI18n("")
@@ -1449,7 +1779,7 @@ func T(key string, args ...interface{}) string {
 		p = printer
 		printerMu.RUnlock()
 	}
-	
+
 	// Use local copy to avoid holding lock during sprintf
 	return p.Sprintf(key, args...)
 }

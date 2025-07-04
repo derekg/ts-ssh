@@ -41,21 +41,21 @@ func shouldUseLegacyCLI() bool {
 	if os.Getenv("TS_SSH_LEGACY_CLI") == "1" {
 		return true
 	}
-	
+
 	// Check if the command line looks like it's using the old style
 	// (this helps with backwards compatibility during transition)
 	if len(os.Args) > 1 {
 		firstArg := os.Args[1]
 		// If first arg starts with user@ or contains :, it's likely a connection target
-		if strings.Contains(firstArg, "@") || 
-		   (strings.Contains(firstArg, ":") && !strings.HasPrefix(firstArg, "-")) {
+		if strings.Contains(firstArg, "@") ||
+			(strings.Contains(firstArg, ":") && !strings.HasPrefix(firstArg, "-")) {
 			// Insert "connect" subcommand for backwards compatibility
 			newArgs := []string{os.Args[0], "connect"}
 			newArgs = append(newArgs, os.Args[1:]...)
 			os.Args = newArgs
 		}
 	}
-	
+
 	return false
 }
 
@@ -87,12 +87,12 @@ func isSubcommand(arg string) bool {
 		"connect", "scp", "list", "exec", "multi", "config", "pqc", "version",
 		"help", "-h", "--help", "-v", "--version",
 	}
-	
+
 	for _, cmd := range subcommands {
 		if arg == cmd {
 			return true
 		}
 	}
-	
+
 	return false
 }

@@ -29,7 +29,7 @@ type TmuxManager struct {
 func NewTmuxManager(logger *log.Logger, sshUser, sshKeyPath string, insecureHostKey bool) *TmuxManager {
 	// Create a unique session name based on timestamp
 	sessionName := fmt.Sprintf("ts-ssh-%d", time.Now().Unix())
-	
+
 	return &TmuxManager{
 		logger:          logger,
 		sessionName:     sessionName,
@@ -44,24 +44,24 @@ func (tm *TmuxManager) StartMultiSession(hosts []string) error {
 	if len(hosts) == 0 {
 		return fmt.Errorf("no hosts provided")
 	}
-	
+
 	tm.logger.Printf("Creating tmux session '%s' with %d hosts", tm.sessionName, len(hosts))
-	
+
 	// Check if tmux is available
 	if !tm.isTmuxAvailable() {
 		return fmt.Errorf("tmux is not installed or not available in PATH")
 	}
-	
+
 	// Kill any existing session with the same name
 	tm.killExistingSession()
-	
+
 	// Create new tmux session with the first host
 	firstHost := hosts[0]
 	err := tm.createInitialSession(firstHost)
 	if err != nil {
 		return fmt.Errorf("failed to create initial tmux session: %w", err)
 	}
-	
+
 	// Add additional hosts as new windows
 	for i, host := range hosts[1:] {
 		windowName := fmt.Sprintf("ssh-%d", i+2)
@@ -71,10 +71,10 @@ func (tm *TmuxManager) StartMultiSession(hosts []string) error {
 			// Continue with other hosts even if one fails
 		}
 	}
-	
+
 	// Set up tmux configuration for better experience
 	tm.configureTmux()
-	
+
 	// Attach to the session
 	return tm.attachToSession()
 }
@@ -98,21 +98,21 @@ func (tm *TmuxManager) createInitialSession(host string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Store config file for cleanup
 	tm.tempConfigFiles = append(tm.tempConfigFiles, configFile)
-	
+
 	// Create new tmux session with SSH command
 	cmd := exec.Command("tmux", "new-session", "-d", "-s", tm.sessionName, "-n", "ssh-1")
 	cmd.Env = os.Environ()
-	
+
 	tm.logger.Printf("Creating tmux session with secure command (credentials protected)")
-	
+
 	err = cmd.Run()
 	if err != nil {
 		return err
 	}
-	
+
 	// Send SSH command to the session
 	return tm.sendKeysToWindow("ssh-1", sshCmd)
 }
@@ -122,9 +122,9 @@ func (tm *TmuxManager) createInitialSessionDryRun(host string) error {
 	// Create new tmux session (detached, no commands sent)
 	cmd := exec.Command("tmux", "new-session", "-d", "-s", tm.sessionName, "-n", "ssh-1")
 	cmd.Env = os.Environ()
-	
+
 	tm.logger.Printf("Creating tmux session (dry run) with command: %s", strings.Join(cmd.Args, " "))
-	
+
 	return cmd.Run()
 }
 
@@ -134,17 +134,17 @@ func (tm *TmuxManager) addWindow(windowName, host string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Store config file for cleanup
 	tm.tempConfigFiles = append(tm.tempConfigFiles, configFile)
-	
+
 	// Create new window
 	cmd := exec.Command("tmux", "new-window", "-t", tm.sessionName, "-n", windowName)
 	err = cmd.Run()
 	if err != nil {
 		return err
 	}
-	
+
 	// Send SSH command to the new window
 	return tm.sendKeysToWindow(windowName, sshCmd)
 }
@@ -155,17 +155,17 @@ func (tm *TmuxManager) sendKeysToWindow(windowName, command string) error {
 	if err := security.ValidateWindowName(windowName); err != nil {
 		return fmt.Errorf("window name validation failed: %w", err)
 	}
-	
+
 	// SECURITY: Validate command to prevent injection
 	if err := security.ValidateCommand(command); err != nil {
 		return fmt.Errorf("command validation failed: %w", err)
 	}
-	
+
 	target := fmt.Sprintf("%s:%s", tm.sessionName, windowName)
 	cmd := exec.Command("tmux", "send-keys", "-t", target, command, "Enter")
-	
+
 	tm.logger.Printf("Sending to window %s: [command validated]", windowName)
-	
+
 	return cmd.Run()
 }
 
@@ -176,21 +176,21 @@ func (tm *TmuxManager) buildSecureSSHCommand(host string) (string, string, error
 	if err := security.ValidateHostname(host); err != nil {
 		return "", "", fmt.Errorf("hostname validation failed: %w", err)
 	}
-	
+
 	// Create temporary SSH config file to avoid credential exposure
 	tempConfigFile, err := tm.createTemporarySSHConfig(host)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create temporary SSH config: %w", err)
 	}
-	
+
 	// Build command using config file instead of command line args
-	cmdParts := []string{os.Args[0]} // Our binary path
+	cmdParts := []string{os.Args[0]}                  // Our binary path
 	cmdParts = append(cmdParts, "-F", tempConfigFile) // Use SSH config file
-	
+
 	// SECURITY: Sanitize hostname for shell execution
 	sanitizedHost := security.SanitizeShellArg(host)
 	cmdParts = append(cmdParts, sanitizedHost) // Safely escaped hostname
-	
+
 	return strings.Join(cmdParts, " "), tempConfigFile, nil
 }
 
@@ -200,18 +200,18 @@ func (tm *TmuxManager) createTemporarySSHConfig(host string) (string, error) {
 	if err := security.ValidateHostname(host); err != nil {
 		return "", fmt.Errorf("hostname validation failed: %w", err)
 	}
-	
+
 	// Generate secure filename for temporary config using multiple sanitization layers
 	// First, use filepath.Base to strip any path components (prevent directory traversal)
 	safeHostname := filepath.Base(host)
-	
+
 	// Remove or replace ALL potentially dangerous characters for filesystem safety
 	// This is more comprehensive than just : and @
 	dangerousChars := ":@/\\<>|*?\"'"
 	for _, char := range dangerousChars {
 		safeHostname = strings.ReplaceAll(safeHostname, string(char), "_")
 	}
-	
+
 	// Remove any control characters or non-printable characters
 	var cleanHostname strings.Builder
 	for _, r := range safeHostname {
@@ -222,52 +222,52 @@ func (tm *TmuxManager) createTemporarySSHConfig(host string) (string, error) {
 		}
 	}
 	safeHostname = cleanHostname.String()
-	
+
 	// Ensure we don't start with dangerous characters like dots or hyphens
 	safeHostname = strings.TrimLeft(safeHostname, ".-_")
 	if safeHostname == "" {
 		safeHostname = "host" // Fallback if hostname becomes empty after sanitization
 	}
-	
+
 	// Limit length to prevent filesystem issues
 	if len(safeHostname) > config.MaxHostnameLength {
 		safeHostname = safeHostname[:config.MaxHostnameLength]
 	}
 	tempFileName := fmt.Sprintf("/tmp/ts-ssh-config-%s-%s.conf", safeHostname, security.GenerateRandomSuffix())
-	
+
 	// Create temporary file with secure permissions atomically
 	tempFile, err := security.CreateSecureFile(tempFileName, 0600)
 	if err != nil {
 		return "", fmt.Errorf("failed to create secure temporary SSH config: %w", err)
 	}
-	
+
 	// Generate SSH config content
 	config := fmt.Sprintf(`# Temporary SSH config for ts-ssh tmux session
 Host %s
     User %s
 `, host, tm.sshUser)
-	
+
 	if tm.sshKeyPath != "" {
 		config += fmt.Sprintf("    IdentityFile %s\n", tm.sshKeyPath)
 	}
-	
+
 	if tm.insecureHostKey {
 		config += "    StrictHostKeyChecking no\n"
 		config += "    UserKnownHostsFile /dev/null\n"
 	} else {
 		config += "    StrictHostKeyChecking yes\n"
 	}
-	
+
 	config += "    LogLevel QUIET\n"
 	config += "    BatchMode no\n" // Allow password prompts
-	
+
 	// Write config to file
 	if _, err := tempFile.WriteString(config); err != nil {
 		tempFile.Close()
 		os.Remove(tempFile.Name())
 		return "", err
 	}
-	
+
 	tempFile.Close()
 	return tempFile.Name(), nil
 }
@@ -288,7 +288,7 @@ func (tm *TmuxManager) configureTmux() {
 		// Set escape time for better responsiveness
 		{"set-option", "-t", tm.sessionName, "escape-time", "10"},
 	}
-	
+
 	for _, config := range configs {
 		cmd := exec.Command("tmux", config...)
 		err := cmd.Run()
@@ -296,7 +296,7 @@ func (tm *TmuxManager) configureTmux() {
 			tm.logger.Printf("Warning: failed to set tmux option %v: %v", config, err)
 		}
 	}
-	
+
 	// Display helpful message in each window
 	tm.displayWelcomeMessage()
 }
@@ -313,7 +313,7 @@ func (tm *TmuxManager) displayWelcomeMessage() {
 		"#   Ctrl+B d     - Detach from session\\n" +
 		"#   Ctrl+B ?     - Show all key bindings\\n" +
 		"# Connecting..."
-	
+
 	// Display message in the first window
 	target := fmt.Sprintf("%s:ssh-1", tm.sessionName)
 	cmd := exec.Command("tmux", "display-message", "-t", target, "-d", "3000", message)
@@ -323,7 +323,7 @@ func (tm *TmuxManager) displayWelcomeMessage() {
 // attachToSession attaches to the tmux session (this will block until detached)
 func (tm *TmuxManager) attachToSession() error {
 	tm.logger.Printf("Attaching to tmux session '%s'", tm.sessionName)
-	
+
 	// Check if we're in a terminal environment
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		tm.logger.Printf("Not running in a terminal, cannot attach to tmux session")
@@ -332,32 +332,32 @@ func (tm *TmuxManager) attachToSession() error {
 		fmt.Printf("Or list sessions with: tmux list-sessions\n")
 		return nil
 	}
-	
+
 	// Attach to session - this will transfer control to tmux
 	cmd := exec.Command("tmux", "attach-session", "-t", tm.sessionName)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	err := cmd.Run()
-	
+
 	// When we get here, user has detached from tmux or session ended
 	tm.logger.Printf("Detached from tmux session '%s'", tm.sessionName)
-	
+
 	return err
 }
 
 // CleanupSession kills the tmux session and cleans up temporary files
 func (tm *TmuxManager) CleanupSession() error {
 	tm.logger.Printf("Cleaning up tmux session '%s'", tm.sessionName)
-	
+
 	// Kill tmux session
 	cmd := exec.Command("tmux", "kill-session", "-t", tm.sessionName)
 	err := cmd.Run()
-	
+
 	// Clean up temporary SSH config files
 	tm.cleanupTempConfigFiles()
-	
+
 	return err
 }
 
@@ -378,11 +378,11 @@ func (tm *TmuxManager) AddHost(host string) error {
 	if !tm.isSessionActive() {
 		return fmt.Errorf("tmux session '%s' is not active", tm.sessionName)
 	}
-	
+
 	// Find next available window number
 	windowNum := tm.getNextWindowNumber()
 	windowName := fmt.Sprintf("ssh-%d", windowNum)
-	
+
 	return tm.addWindow(windowName, host)
 }
 
@@ -399,7 +399,7 @@ func (tm *TmuxManager) getNextWindowNumber() int {
 	if err != nil {
 		return 1
 	}
-	
+
 	// Parse existing window numbers and find the next available
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	maxNum := 0
@@ -410,6 +410,6 @@ func (tm *TmuxManager) getNextWindowNumber() int {
 			maxNum = num
 		}
 	}
-	
+
 	return maxNum + 1
 }

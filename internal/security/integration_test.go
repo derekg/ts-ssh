@@ -30,7 +30,7 @@ func TestSecurityWorkflowIntegration(t *testing.T) {
 			workflow: testCompleteSSHKeyDiscoveryWorkflow,
 		},
 		{
-			name:     "insecure_mode_audit_logging_workflow", 
+			name:     "insecure_mode_audit_logging_workflow",
 			workflow: testInsecureModeAuditLoggingWorkflow,
 		},
 		{
@@ -78,15 +78,15 @@ func testCompleteSSHKeyDiscoveryWorkflow(t *testing.T, tempDir string) {
 		name     string
 		priority int
 	}{
-		{"id_rsa", 3},      // Lowest priority
-		{"id_ecdsa", 2},    // Medium priority  
-		{"id_ed25519", 1},  // Highest priority
+		{"id_rsa", 3},     // Lowest priority
+		{"id_ecdsa", 2},   // Medium priority
+		{"id_ed25519", 1}, // Highest priority
 	}
 
 	var createdKeys []string
 	for _, keyType := range keyTypes {
 		keyPath := filepath.Join(sshDir, keyType.name)
-		
+
 		// Generate a test key file
 		testKeyContent := fmt.Sprintf("-----BEGIN PRIVATE KEY-----\ntest_%s_key_content\n-----END PRIVATE KEY-----\n", keyType.name)
 		if err := os.WriteFile(keyPath, []byte(testKeyContent), 0600); err != nil {
@@ -113,7 +113,7 @@ func testCompleteSSHKeyDiscoveryWorkflow(t *testing.T, tempDir string) {
 			t.Errorf("Failed to stat key file %s: %v", keyPath, err)
 			continue
 		}
-		
+
 		if info.Mode().Perm() != 0600 {
 			t.Errorf("Key file %s has incorrect permissions: got %v, want 0600", keyPath, info.Mode().Perm())
 		}
@@ -198,7 +198,7 @@ func testInsecureModeAuditLoggingWorkflow(t *testing.T, tempDir string) {
 	logString := string(logContent)
 	expectedEvents := []string{
 		"HOST_KEY_BYPASS",
-		"SSH_AUTH", 
+		"SSH_AUTH",
 		"HOST_KEY_VERIFICATION",
 		"FILE_OPERATION",
 		"TTY_SECURITY",
@@ -228,9 +228,9 @@ func testSecureFileOperationsWorkflow(t *testing.T, tempDir string) {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			
+
 			filename := filepath.Join(tempDir, fmt.Sprintf("secure_file_%d.txt", id))
-			
+
 			// Test atomic file creation
 			file, err := CreateSecureFile(filename, 0600)
 			if err != nil {
@@ -238,26 +238,26 @@ func testSecureFileOperationsWorkflow(t *testing.T, tempDir string) {
 				return
 			}
 			defer file.Close()
-			
+
 			// Write test content
 			testContent := fmt.Sprintf("Secure content from goroutine %d", id)
 			if _, err := file.WriteString(testContent); err != nil {
 				results <- fmt.Errorf("goroutine %d: failed to write content: %w", id, err)
 				return
 			}
-			
+
 			// Verify file permissions
 			info, err := file.Stat()
 			if err != nil {
 				results <- fmt.Errorf("goroutine %d: failed to stat file: %w", id, err)
 				return
 			}
-			
+
 			if info.Mode().Perm() != 0600 {
 				results <- fmt.Errorf("goroutine %d: incorrect file permissions: got %v, want 0600", id, info.Mode().Perm())
 				return
 			}
-			
+
 			results <- nil
 		}(i)
 	}
@@ -281,7 +281,7 @@ func testSecureFileOperationsWorkflow(t *testing.T, tempDir string) {
 
 	// Test atomic file replacement
 	testFile := filepath.Join(tempDir, "atomic_replacement_test.txt")
-	
+
 	// Create initial file
 	initialFile, err := CreateSecureFile(testFile, 0600)
 	if err != nil {
@@ -295,10 +295,10 @@ func testSecureFileOperationsWorkflow(t *testing.T, tempDir string) {
 	if err != nil {
 		t.Fatalf("Failed to create secure download file for replacement: %v", err)
 	}
-	
+
 	// Write new content
 	downloadFile.WriteString("replaced content")
-	
+
 	// Complete atomic replacement
 	if err := CompleteAtomicReplacement(downloadFile); err != nil {
 		t.Fatalf("Failed to complete atomic replacement: %v", err)
@@ -309,7 +309,7 @@ func testSecureFileOperationsWorkflow(t *testing.T, tempDir string) {
 	if err != nil {
 		t.Fatalf("Failed to read replaced file: %v", err)
 	}
-	
+
 	if string(content) != "replaced content" {
 		t.Errorf("Atomic replacement failed: got %q, want %q", string(content), "replaced content")
 	}
@@ -349,19 +349,19 @@ func testCrossPlatformSecurityWorkflow(t *testing.T, tempDir string) {
 		// Test prctl-based process security
 		// maskProcessTitleLinux("test-linux-title") // Moved to platform package tests
 		t.Logf("✓ Linux prctl-based process masking tested")
-		
+
 	case "darwin":
 		t.Logf("Testing macOS-specific security features")
 		// Test Darwin-specific process security via platform function
 		// maskProcessTitlePlatform("test-darwin-title") // Moved to platform package tests
 		t.Logf("✓ macOS process masking tested")
-		
+
 	case "windows":
 		t.Logf("Testing Windows-specific security features")
 		// Test Windows-specific process security via platform function
 		// maskProcessTitlePlatform("test-windows-title") // Moved to platform package tests
 		t.Logf("✓ Windows process masking tested")
-		
+
 	default:
 		t.Logf("Testing generic Unix security features for %s", runtime.GOOS)
 		// maskProcessTitlePlatform("test-generic-title") // Moved to platform package tests
@@ -549,7 +549,7 @@ func TestSecurityEventLogging(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	logPath := filepath.Join(tempDir, "test_security.log")
-	
+
 	// Test initialization and cleanup
 	t.Run("logger_lifecycle", func(t *testing.T) {
 		os.Setenv("TS_SSH_SECURITY_AUDIT", "1")
@@ -610,7 +610,7 @@ func TestSecurityEventLogging(t *testing.T) {
 	t.Run("disabled_logger", func(t *testing.T) {
 		// Test with logging disabled
 		os.Unsetenv("TS_SSH_SECURITY_AUDIT")
-		
+
 		if err := InitSecurityLogger(); err != nil {
 			t.Fatalf("Failed to initialize disabled security logger: %v", err)
 		}
@@ -621,7 +621,7 @@ func TestSecurityEventLogging(t *testing.T) {
 
 		// Logging should be safe to call even when disabled
 		LogInsecureModeUsage("test-host", "test-user", false, true)
-		
+
 		CloseSecurityLogger()
 
 		t.Logf("✓ Disabled security logger validated")
@@ -664,7 +664,7 @@ func TestSecurityCompliance(t *testing.T) {
 			}
 
 			if info.Mode().Perm() != tf.mode {
-				t.Errorf("File %s has incorrect permissions: got %v, want %v", 
+				t.Errorf("File %s has incorrect permissions: got %v, want %v",
 					tf.name, info.Mode().Perm(), tf.mode)
 			}
 		}
@@ -725,7 +725,7 @@ func TestSecurityCompliance(t *testing.T) {
 		logString := string(content)
 		requiredFields := []string{
 			"timestamp",
-			"event_type", 
+			"event_type",
 			"severity",
 			"user",
 			"host",

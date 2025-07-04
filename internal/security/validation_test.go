@@ -432,7 +432,7 @@ func TestValidateWindowName(t *testing.T) {
 func BenchmarkValidateHostname(b *testing.B) {
 	validator := NewInputValidator()
 	hostname := "www.example.com"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		validator.ValidateHostname(hostname)
@@ -442,7 +442,7 @@ func BenchmarkValidateHostname(b *testing.B) {
 func BenchmarkValidateFilePath(b *testing.B) {
 	validator := NewInputValidator()
 	path := "/home/user/documents/file.txt"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		validator.ValidateFilePath(path)
@@ -452,7 +452,7 @@ func BenchmarkValidateFilePath(b *testing.B) {
 func BenchmarkSanitizeShellArg(b *testing.B) {
 	validator := NewInputValidator()
 	arg := "complex argument with spaces and 'quotes'"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		validator.SanitizeShellArg(arg)

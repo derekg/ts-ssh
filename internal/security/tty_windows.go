@@ -14,10 +14,10 @@ func validateTTYOwnership(info os.FileInfo, ttyPath string) error {
 	// On Windows, TTY security is handled differently
 	// Windows doesn't have the same UID/GID concept as Unix systems
 	// The main security comes from process isolation and access controls
-	
+
 	// For now, we perform basic file existence and accessibility checks
 	// More sophisticated Windows security could be added later using Windows APIs
-	
+
 	// Check if we can access the file (basic permission check)
 	file, err := os.OpenFile(ttyPath, os.O_RDWR, 0)
 	if err != nil {
@@ -33,12 +33,12 @@ func validateTTYOwnership(info os.FileInfo, ttyPath string) error {
 func validateTTYPermissions(info os.FileInfo, ttyPath string) error {
 	// Windows doesn't use Unix-style permission bits
 	// Instead, it uses Access Control Lists (ACLs)
-	
+
 	// For basic security, we ensure the file is accessible to the current process
 	// More advanced Windows ACL checking could be implemented using Windows APIs
-	
+
 	mode := info.Mode()
-	
+
 	// On Windows, check if it's a device (should be for console/TTY)
 	if mode&os.ModeDevice == 0 && mode&os.ModeCharDevice == 0 {
 		return fmt.Errorf("TTY path is not a device on Windows")
@@ -52,9 +52,9 @@ func validateTTYPermissions(info os.FileInfo, ttyPath string) error {
 func validateOpenTTYOwnership(info os.FileInfo) error {
 	// On Windows, if we successfully opened the TTY and got file info,
 	// the process has appropriate access rights
-	
+
 	// Additional Windows-specific security checks could be added here
 	// using Windows security APIs like GetSecurityInfo()
-	
+
 	return nil
 }

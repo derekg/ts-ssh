@@ -27,12 +27,12 @@ func TestTerminalStateManager(t *testing.T) {
 	// Test concurrent access - this is the main race condition test
 	t.Run("concurrent access", func(t *testing.T) {
 		done := make(chan bool, 10)
-		
+
 		// Start multiple goroutines that access the terminal state
 		for i := 0; i < 10; i++ {
 			go func() {
 				defer func() { done <- true }()
-				
+
 				// Simulate rapid access to terminal state methods
 				for j := 0; j < 100; j++ {
 					manager.IsRaw()

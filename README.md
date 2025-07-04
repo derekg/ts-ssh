@@ -485,6 +485,28 @@ Once authorized, `ts-ssh` stores authentication keys in the state directory (`~/
 
 For detailed security information, see [Security Documentation](docs/security/)
 
+## Recent Improvements (Latest Version)
+
+### 🎯 Authentication Flow Enhancement
+- **Fixed Authentication URL Display**: Auth URLs now properly appear in non-verbose mode
+- **Improved Tailscale Integration**: Better `tsnet` logger configuration for user-facing messages
+- **Streamlined Connection Process**: Cleaner output with essential information prioritized
+
+### 🌐 Enhanced Internationalization  
+- **Comprehensive Translation Coverage**: All user-facing messages now properly translated
+- **Missing Translation Detection**: Added systematic approach to identify untranslated strings
+- **Improved Format String Safety**: Fixed go vet warnings for non-constant format strings
+
+### 🔧 Code Quality & Organization
+- **Refactored Core Functions**: Broke down large functions into focused, maintainable helpers
+- **Enhanced Error Handling**: Consistent error wrapping with proper translation support
+- **Improved Testing**: All tests passing with better coverage of edge cases
+
+### 🎨 CLI Framework Improvements
+- **Better Help Text Rendering**: Addressed spacing issues in command examples
+- **Enhanced User Experience**: Improved styling and consistency across all commands
+- **Robust Translation Integration**: All CLI text properly supports multi-language display
+
 ## Architecture
 
 ts-ssh follows enterprise-grade Go project standards with a modular internal package structure:
@@ -493,8 +515,16 @@ ts-ssh follows enterprise-grade Go project standards with a modular internal pac
 - **`internal/client/ssh/`**: SSH connection management and authentication  
 - **`internal/client/scp/`**: SCP file transfer implementation
 - **`internal/platform/`**: Cross-platform process and environment handling
+- **`tsnet_handler.go`**: Tailscale network integration with proper auth URL handling
+- **`i18n.go`**: Comprehensive internationalization system supporting 11 languages
 
-This architecture ensures maintainability, testability, and security isolation.
+### Key Technical Insights
+- **Authentication URLs**: Properly configured via `tsnet.Server.UserLogf` using dedicated stderr logger
+- **Translation System**: Dynamic language detection with environment variable priority
+- **Logger Management**: Clear separation between debug logging and user-facing messages
+- **CLI Framework**: Modern Cobra/Fang integration with legacy compatibility mode
+
+This architecture ensures maintainability, testability, security isolation, and excellent user experience.
 
 ## Testing
 

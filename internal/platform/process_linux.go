@@ -21,7 +21,7 @@ func maskProcessTitleLinux(title string) {
 		titleBytes = titleBytes[:15]
 		titleBytes[14] = 0
 	}
-	
+
 	// PR_SET_NAME = 15 - Linux-specific syscall
 	const PR_SET_NAME = 15
 	syscall.Syscall(syscall.SYS_PRCTL, PR_SET_NAME, uintptr(unsafe.Pointer(&titleBytes[0])), 0)

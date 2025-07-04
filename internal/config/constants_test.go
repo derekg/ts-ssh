@@ -115,13 +115,13 @@ func TestTimeoutValues(t *testing.T) {
 			if timeout <= 0 {
 				t.Errorf("%s should be positive, got %v", name, timeout)
 			}
-			
+
 			// Timeouts should be reasonable (not too large)
 			maxReasonable := 600 // 10 minutes in seconds
 			if timeout > maxReasonable {
 				t.Errorf("%s seems too large: %v (max reasonable: %v)", name, timeout, maxReasonable)
 			}
-			
+
 			// Timeouts should not be too small
 			minReasonable := 1 // 1 second
 			if timeout < minReasonable {
@@ -136,23 +136,23 @@ func TestApplicationValues(t *testing.T) {
 	if MaxConcurrentConnections <= 0 {
 		t.Errorf("MaxConcurrentConnections should be positive, got %d", MaxConcurrentConnections)
 	}
-	
+
 	if MaxConcurrentConnections > 100 {
 		t.Errorf("MaxConcurrentConnections seems too large: %d", MaxConcurrentConnections)
 	}
-	
+
 	if DefaultBatchSize <= 0 {
 		t.Errorf("DefaultBatchSize should be positive, got %d", DefaultBatchSize)
 	}
-	
+
 	if MaxLogFileSize <= 0 {
 		t.Errorf("MaxLogFileSize should be positive, got %d", MaxLogFileSize)
 	}
-	
+
 	if MaxLogFiles <= 0 {
 		t.Errorf("MaxLogFiles should be positive, got %d", MaxLogFiles)
 	}
-	
+
 	// Check that hostname length is reasonable
 	if MaxHostnameLength <= 0 || MaxHostnameLength > 255 {
 		t.Errorf("MaxHostnameLength should be between 1 and 255, got %d", MaxHostnameLength)
@@ -165,14 +165,14 @@ func TestModernKeyTypes(t *testing.T) {
 	if len(ModernKeyTypes) == 0 {
 		t.Error("ModernKeyTypes should not be empty")
 	}
-	
+
 	// Array should not contain empty strings
 	for i, keyType := range ModernKeyTypes {
 		if keyType == "" {
 			t.Errorf("ModernKeyTypes[%d] should not be empty", i)
 		}
 	}
-	
+
 	// Array should not contain duplicates
 	seen := make(map[string]bool)
 	for i, keyType := range ModernKeyTypes {
@@ -188,15 +188,15 @@ func TestModernKeyTypesContent(t *testing.T) {
 	// Check that expected key types are present
 	expectedKeyTypes := []string{
 		"id_ed25519",
-		"id_ecdsa", 
+		"id_ecdsa",
 		"id_rsa",
 	}
-	
+
 	keyTypeSet := make(map[string]bool)
 	for _, keyType := range ModernKeyTypes {
 		keyTypeSet[keyType] = true
 	}
-	
+
 	for _, expected := range expectedKeyTypes {
 		if !keyTypeSet[expected] {
 			t.Errorf("ModernKeyTypes should contain %s", expected)
@@ -210,7 +210,7 @@ func TestFilePermissions(t *testing.T) {
 	if SecureFilePermissions != 0600 {
 		t.Errorf("SecureFilePermissions = %o, want 0600", SecureFilePermissions)
 	}
-	
+
 	// Test secure directory permissions (0700 = owner read/write/execute only)
 	if SecureDirectoryPermissions != 0700 {
 		t.Errorf("SecureDirectoryPermissions = %o, want 0700", SecureDirectoryPermissions)
@@ -222,15 +222,15 @@ func TestSSHConfigConstants(t *testing.T) {
 	if KnownHostsFileName == "" {
 		t.Error("KnownHostsFileName should not be empty")
 	}
-	
+
 	if SSHConfigDirName == "" {
 		t.Error("SSHConfigDirName should not be empty")
 	}
-	
+
 	if SSHConfigDirName != ".ssh" {
 		t.Errorf("SSHConfigDirName = %s, want .ssh", SSHConfigDirName)
 	}
-	
+
 	if KnownHostsFileName != "known_hosts" {
 		t.Errorf("KnownHostsFileName = %s, want known_hosts", KnownHostsFileName)
 	}
@@ -241,7 +241,7 @@ func TestTmuxConfiguration(t *testing.T) {
 	if TmuxSessionPrefix == "" {
 		t.Error("TmuxSessionPrefix should not be empty")
 	}
-	
+
 	if TmuxSessionPrefix != "ts-ssh" {
 		t.Errorf("TmuxSessionPrefix = %s, want ts-ssh", TmuxSessionPrefix)
 	}
@@ -253,15 +253,15 @@ func TestVersionVariables(t *testing.T) {
 	if Version == "" {
 		t.Error("Version should not be empty")
 	}
-	
+
 	if GitCommit == "" {
 		t.Error("GitCommit should not be empty")
 	}
-	
+
 	if BuildTime == "" {
 		t.Error("BuildTime should not be empty")
 	}
-	
+
 	// Test default values
 	if Version != "dev" {
 		t.Logf("Version is set to: %s (expected 'dev' for development builds)", Version)
@@ -273,7 +273,7 @@ func TestPreferredKeyTypes(t *testing.T) {
 	if PreferredKeyTypes == "" {
 		t.Error("PreferredKeyTypes should not be empty")
 	}
-	
+
 	// Should contain expected key types
 	expectedTypes := []string{"ed25519", "ecdsa", "rsa"}
 	for _, keyType := range expectedTypes {
@@ -287,35 +287,35 @@ func TestPreferredKeyTypes(t *testing.T) {
 func TestConfigurationConsistency(t *testing.T) {
 	// Connection timeout should be longer than SSH handshake timeout
 	if DefaultConnectionTimeout <= SSHHandshakeTimeout {
-		t.Errorf("DefaultConnectionTimeout (%d) should be longer than SSHHandshakeTimeout (%d)", 
+		t.Errorf("DefaultConnectionTimeout (%d) should be longer than SSHHandshakeTimeout (%d)",
 			DefaultConnectionTimeout, SSHHandshakeTimeout)
 	}
-	
+
 	// SSH auth timeout should be reasonable compared to connect timeout
 	if SSHAuthTimeout > DefaultConnectionTimeout {
-		t.Errorf("SSHAuthTimeout (%d) should not be longer than DefaultConnectionTimeout (%d)", 
+		t.Errorf("SSHAuthTimeout (%d) should not be longer than DefaultConnectionTimeout (%d)",
 			SSHAuthTimeout, DefaultConnectionTimeout)
 	}
-	
+
 	// Command timeout should be longer than connection timeout
 	if DefaultCommandTimeout <= DefaultConnectionTimeout {
-		t.Errorf("DefaultCommandTimeout (%d) should be longer than DefaultConnectionTimeout (%d)", 
+		t.Errorf("DefaultCommandTimeout (%d) should be longer than DefaultConnectionTimeout (%d)",
 			DefaultCommandTimeout, DefaultConnectionTimeout)
 	}
-	
+
 	// Batch size should not exceed max concurrent connections
 	if DefaultBatchSize > MaxConcurrentConnections {
-		t.Errorf("DefaultBatchSize (%d) should not exceed MaxConcurrentConnections (%d)", 
+		t.Errorf("DefaultBatchSize (%d) should not exceed MaxConcurrentConnections (%d)",
 			DefaultBatchSize, MaxConcurrentConnections)
 	}
 }
 
 // Helper function to check if a string contains a substring
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || 
-		(len(s) > len(substr) && (s[:len(substr)] == substr || 
-		s[len(s)-len(substr):] == substr || 
-		findInString(s, substr))))
+	return len(s) >= len(substr) && (s == substr ||
+		(len(s) > len(substr) && (s[:len(substr)] == substr ||
+			s[len(s)-len(substr):] == substr ||
+			findInString(s, substr))))
 }
 
 func findInString(s, substr string) bool {

@@ -17,7 +17,7 @@ func CreateSecureFile(filename string, mode os.FileMode) (*os.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secure file %s: %w", filename, err)
 	}
-	
+
 	// Verify permissions were set correctly (defense in depth)
 	info, err := file.Stat()
 	if err != nil {
@@ -25,13 +25,13 @@ func CreateSecureFile(filename string, mode os.FileMode) (*os.File, error) {
 		os.Remove(filename)
 		return nil, fmt.Errorf("failed to verify file permissions: %w", err)
 	}
-	
+
 	if info.Mode() != mode {
 		file.Close()
 		os.Remove(filename)
 		return nil, fmt.Errorf("file permissions not set correctly: expected %v, got %v", mode, info.Mode())
 	}
-	
+
 	return file, nil
 }
 
@@ -46,7 +46,7 @@ func CreateSecureFileForAppend(filename string, mode os.FileMode) (*os.File, err
 		// Open for append
 		return os.OpenFile(filename, os.O_WRONLY|os.O_APPEND, mode)
 	}
-	
+
 	// File doesn't exist, create it securely
 	return CreateSecureFile(filename, mode)
 }
@@ -58,7 +58,7 @@ func CreateSecureKnownHostsFile(knownHostsPath string) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("failed to create ssh directory: %w", err)
 	}
-	
+
 	// Create known_hosts file atomically with secure permissions
 	file, err := CreateSecureFileForAppend(knownHostsPath, 0600)
 	if err != nil {
@@ -69,13 +69,13 @@ func CreateSecureKnownHostsFile(knownHostsPath string) error {
 		return err
 	}
 	defer file.Close()
-	
+
 	// Write initial content if it's a new file
 	if stat, err := file.Stat(); err == nil && stat.Size() == 0 {
 		_, err = file.WriteString("# SSH Known Hosts managed by ts-ssh\n")
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -85,7 +85,7 @@ func verifyFilePermissions(filename string, expectedMode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	
+
 	if info.Mode() != expectedMode {
 		return os.Chmod(filename, expectedMode)
 	}
@@ -96,7 +96,7 @@ func verifyFilePermissions(filename string, expectedMode os.FileMode) error {
 func secureFileCopy(src, dst string, mode os.FileMode) error {
 	// Create temporary file with secure permissions
 	tempFile := dst + ".tmp." + GenerateRandomSuffix()
-	
+
 	file, err := CreateSecureFile(tempFile, mode)
 	if err != nil {
 		return err
@@ -105,29 +105,29 @@ func secureFileCopy(src, dst string, mode os.FileMode) error {
 		file.Close()
 		os.Remove(tempFile) // Cleanup on error
 	}()
-	
+
 	// Open source file
 	srcFile, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
 	}
 	defer srcFile.Close()
-	
+
 	// Copy content
 	if _, err := file.ReadFrom(srcFile); err != nil {
 		return fmt.Errorf("failed to copy file content: %w", err)
 	}
-	
+
 	// Close before rename
 	if err := file.Close(); err != nil {
 		return fmt.Errorf("failed to close temporary file: %w", err)
 	}
-	
+
 	// Atomic rename
 	if err := os.Rename(tempFile, dst); err != nil {
 		return fmt.Errorf("failed to rename temporary file: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -138,18 +138,18 @@ func createSecureDownloadFile(localPath string) (*os.File, error) {
 	return CreateSecureFile(localPath, 0600)
 }
 
-// CreateSecureDownloadFileWithReplace creates a temporary file for SCP download 
+// CreateSecureDownloadFileWithReplace creates a temporary file for SCP download
 // Returns the file and a function to complete the atomic replacement
 func CreateSecureDownloadFileWithReplace(localPath string) (*os.File, error) {
 	// Create temporary file in same directory to ensure atomic move is possible
 	tempPath := localPath + ".tmp." + GenerateRandomSuffix()
-	
+
 	// Create temporary file with secure permissions
 	file, err := CreateSecureFile(tempPath, 0600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary download file: %w", err)
 	}
-	
+
 	// Store the paths for later atomic replacement with thread safety
 	atomicReplaceFilesMutex.Lock()
 	atomicReplaceFiles[file] = atomicReplaceInfo{
@@ -157,7 +157,7 @@ func CreateSecureDownloadFileWithReplace(localPath string) (*os.File, error) {
 		finalPath: localPath,
 	}
 	atomicReplaceFilesMutex.Unlock()
-	
+
 	return file, nil
 }
 
@@ -179,24 +179,24 @@ func CompleteAtomicReplacement(file *os.File) error {
 		delete(atomicReplaceFiles, file)
 	}
 	atomicReplaceFilesMutex.Unlock()
-	
+
 	if !exists {
 		// Not an atomic file, just close normally
 		return file.Close()
 	}
-	
+
 	// Close the file first
 	if err := file.Close(); err != nil {
 		os.Remove(info.tempPath) // Cleanup temp file
 		return fmt.Errorf("failed to close temporary file before rename: %w", err)
 	}
-	
+
 	// Perform atomic rename
 	if err := os.Rename(info.tempPath, info.finalPath); err != nil {
 		os.Remove(info.tempPath) // Clean up temp file
 		return fmt.Errorf("failed to atomically replace file: %w", err)
 	}
-	
+
 	return nil
 }
 
