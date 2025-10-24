@@ -4,28 +4,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ts-ssh is a Go-based SSH and SCP client that uses Tailscale's `tsnet` library to provide userspace connectivity to Tailscale networks without requiring a full Tailscale daemon. The project enables secure SSH connections and file transfers over a Tailnet with enterprise-grade security, comprehensive cross-platform support, and a modern CLI experience powered by Charmbracelet's Fang framework.
+ts-ssh is a simplified Go-based SSH and SCP client that uses Tailscale's `tsnet` library to provide userspace connectivity to Tailscale networks without requiring a full Tailscale daemon. The project enables secure SSH connections and file transfers over a Tailnet with enterprise-grade security and a minimal, ssh-like CLI interface.
+
+**Design Philosophy**: Simplicity over features. This tool mimics the standard `ssh` command with minimal flags and maximum clarity.
 
 ## Guidance Notes
 
 - **Quality Score Tracking**: Do not store quality scores in any artifacts, including markdown files, code comments, commit messages, or pull request descriptions. Quality metrics, including security assessments, should be reported back to the project lead but not memorialized in project artifacts.
+- **Code Simplicity**: Keep the codebase small and maintainable. Avoid adding complexity unless absolutely necessary.
 
 ## CLI Architecture
 
-ts-ssh supports dual CLI modes for optimal user experience:
+ts-ssh uses a simple, flag-based CLI that mimics the standard `ssh` command:
 
-### Modern CLI (Default)
-- Powered by Charmbracelet Fang framework
-- Enhanced styling with Lipgloss
-- Interactive prompts with Huh
-- Structured subcommand architecture
-- Better help organization and styling
+### Basic Usage
+```bash
+ts-ssh [options] [user@]host[:port] [command...]
+ts-ssh -scp source dest
+```
 
-### Legacy CLI
-- Original interface for backward compatibility
-- Script-friendly for automation
-- Controlled via `TS_SSH_LEGACY_CLI=1` environment variable
-- Auto-detection for legacy usage patterns
+### Core Features
+- **SSH Connection**: Just like `ssh`, connect to any host on your Tailnet
+- **SCP Transfer**: Simple file transfer with `-scp` flag
+- **Port Specification**: Use `-p` flag or `host:port` syntax
+- **Verbose Mode**: `-v` for debugging and authentication URLs
+
+### No Subcommands
+- No complex subcommand structure
+- No dual CLI modes
+- No internationalization
+- No styling frameworks
+- Just simple, direct flags
 
 ## Release Considerations
 
@@ -41,27 +50,20 @@ go build -o ts-ssh .
 
 ### Run Tests
 ```bash
-# Run all tests (unit + integration + security)
+# Run all tests
 go test ./...
 
-# Run specific test categories
-go test ./... -run "Test.*[Ss]ecure"        # Security tests only
-go test ./... -run "Test.*[Ii]ntegration"   # Integration tests only
-go test ./... -run "Test.*[Aa]uth"          # Authentication tests only
-
-# Run tests with verbose output
+# Run with verbose output
 go test ./... -v
 
-# Run tests with coverage
+# Run with coverage
 go test ./... -cover
 
-# Test specific modules that previously had 0% coverage
-go test ./internal/errors/... -v -cover     # Error handling (84.6% coverage)
-go test ./internal/config/... -v -cover     # Configuration constants
-go test ./internal/client/scp/... -v -cover # SCP client (11.2% coverage)
+# Run security tests
+go test ./... -run "Test.*[Ss]ecure" -v
 
-# Run security benchmarks
-go test ./... -bench="Benchmark.*[Ss]ecure"
+# Check for race conditions
+go test ./... -race
 ```
 
 ### Cross-compile Examples
@@ -76,93 +78,67 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o ts-ssh-darwin-arm64 .
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ts-ssh-linux-amd64 .
 ```
 
-### Security Assessment
-```bash
-# Run comprehensive security test suite
-go test ./... -run "Test.*[Ss]ecure" -v
-
-# Validate cross-platform security features
-GOOS=windows go test ./... -run "Test.*[Ss]ecure"
-GOOS=darwin go test ./... -run "Test.*[Ss]ecure"
-
-# Check for race conditions
-go test ./... -race
-```
-
 ### Run Application
 
-#### Modern CLI (Default)
 ```bash
-# Subcommand structure with enhanced styling
-./ts-ssh connect [user@]hostname[:port] [-- command...]
-./ts-ssh list                           # Beautiful host listing
-./ts-ssh multi host1,host2,host3        # Enhanced tmux experience
-./ts-ssh exec --command "uptime" host1,host2  # Styled command execution
-./ts-ssh copy file.txt host1:/tmp/      # Enhanced file operations
-./ts-ssh pick                           # Interactive host picker
-./ts-ssh --help                         # Styled help output
-```
+# Basic SSH connection
+./ts-ssh hostname
+./ts-ssh user@hostname
+./ts-ssh user@hostname:2222
 
-#### Legacy CLI (Backward Compatible)
-```bash
-# Original interface for scripts and automation
-export TS_SSH_LEGACY_CLI=1
-./ts-ssh [user@]hostname[:port] [command...]
-./ts-ssh --list                         # Original host listing
-./ts-ssh --multi host1,host2,host3      # Original tmux
-./ts-ssh --exec "uptime" host1,host2    # Original command execution
-./ts-ssh --copy file.txt host1:/tmp/    # Original file operations
-./ts-ssh --pick                         # Original host picker
-./ts-ssh -h                             # Original help
-```
+# Execute remote command
+./ts-ssh hostname uptime
+./ts-ssh user@hostname "ls -la /tmp"
 
-#### CLI Mode Control
-```bash
-# Force legacy mode permanently
-export TS_SSH_LEGACY_CLI=1
+# SCP file transfer
+./ts-ssh -scp file.txt hostname:/tmp/
+./ts-ssh -scp hostname:/tmp/file.txt ./downloads/
 
-# One-time legacy mode usage
-TS_SSH_LEGACY_CLI=1 ./ts-ssh --list
+# With options
+./ts-ssh -v hostname                  # Verbose mode
+./ts-ssh -p 2222 hostname            # Custom port
+./ts-ssh -l alice hostname           # Specify username
+./ts-ssh -i ~/.ssh/custom_key hostname  # Custom key
 
-# Check current mode (modern CLI will show subcommands)
+# Get help
 ./ts-ssh --help
+./ts-ssh --version
 ```
 
 ## Key Dependencies
 
-### Core Libraries
-- **Charmbracelet Fang**: CLI framework for enhanced user experience
-- **Charmbracelet Lipgloss**: Terminal styling and color management
-- **Charmbracelet Huh**: Interactive prompts and user input
-- **Spf13 Cobra**: Underlying command structure (via Fang)
+### Core Libraries (Minimal Set)
 - **Tailscale**: Core networking and `tsnet` integration
 - **golang.org/x/crypto/ssh**: SSH client implementation
-- **golang.org/x/text**: Internationalization support
+- **golang.org/x/term**: Terminal handling for interactive sessions
+- **github.com/bramvdbogaerde/go-scp**: SCP file transfer
 
-### Development Patterns
-```bash
-# When adding new features, ensure both CLI modes work
-go run . connect hostname          # Test modern CLI
-TS_SSH_LEGACY_CLI=1 go run . hostname  # Test legacy CLI
+### Removed Dependencies
+The following were removed to simplify the codebase:
+- ❌ Charmbracelet Fang, Lipgloss, Huh (UI frameworks)
+- ❌ Spf13 Cobra (command framework)
+- ❌ Internationalization (i18n) system
+- ❌ Complex CLI modes
 
-# Test internationalization (11 supported languages)
-LANG=es go run . --help            # Spanish interface
-LANG=zh go run . --help            # Chinese interface
-LANG=de go run . --help            # German interface
-LANG=fr go run . --help            # French interface
-LANG=pt go run . --help            # Portuguese interface
-LANG=ru go run . --help            # Russian interface
-LANG=ja go run . --help            # Japanese interface
-LANG=hi go run . --help            # Hindi interface
-LANG=ar go run . --help            # Arabic interface
-LANG=bn go run . --help            # Bengali interface
-LANG=en go run . --help            # English interface (default)
+## Code Structure
 
-# Validate security across platforms
-GOOS=windows go test ./internal/security/...
-GOOS=darwin go test ./internal/security/...
-GOOS=linux go test ./internal/security/...
 ```
+ts-ssh/
+├── main.go              # ~457 lines - main CLI logic
+├── constants.go         # ~52 lines - constants
+├── main_test.go         # ~256 lines - tests
+└── internal/
+    ├── client/
+    │   ├── scp/         # SCP client implementation
+    │   └── ssh/         # SSH client implementation
+    ├── config/          # Configuration constants
+    ├── crypto/pqc/      # Post-quantum cryptography
+    ├── errors/          # Error handling
+    ├── platform/        # Platform-specific code
+    └── security/        # Security validation
+```
+
+**Total**: ~4,656 lines (down from 15,000 - 69% reduction)
 
 ## Code Quality Standards
 
@@ -179,57 +155,69 @@ go vet ./...
 ```
 
 ### Test Coverage Expectations
-- **Error handling**: Target 80%+ coverage (currently 84.6%)
+- **Error handling**: Target 80%+ coverage
 - **Security modules**: 100% coverage required
 - **Core functionality**: 70%+ coverage minimum
-- **Configuration**: Comprehensive constant validation required
+- **Main CLI**: Test all parsing functions
 
 ## Architecture Insights
 
 ### Tailscale Integration (`tsnet` Library)
 - **Authentication URL Display**: `tsnet.Server.UserLogf` controls where authentication URLs are shown
-- **Key Discovery**: `UserLogf` outputs to stderr by default, but can be redirected to io.Discard in non-verbose mode
-- **Critical Pattern**: Always use a dedicated stderr logger for UserLogf to ensure auth URLs are visible:
+- **Key Discovery**: In non-verbose mode, only authentication URLs are shown
+- **Critical Pattern**: Use UserLogf for auth URLs, Logf for debug info
   ```go
-  stderrLogger := log.New(os.Stderr, "", 0)
-  srv.UserLogf = stderrLogger.Printf
+  if verbose {
+      srv.Logf = logger.Printf
+      srv.UserLogf = logger.Printf
+  } else {
+      srv.Logf = func(string, ...interface{}) {}
+      srv.UserLogf = func(format string, args ...interface{}) {
+          // Filter and show only auth URLs
+      }
+  }
   ```
-- **Logger Configuration**: `srv.Logf` vs `srv.UserLogf` serve different purposes - Logf for debug info, UserLogf for user-facing messages
 
-### Internationalization System
-- **Translation Coverage**: Currently supports 11 languages (en, es, zh, hi, ar, bn, pt, ru, ja, de, fr)
-- **Missing Translation Detection**: Use `rg "T\(\"[^\"]*\"\)" -o -h --no-filename | sort | uniq` to find all translation keys
-- **Translation Validation**: Check for missing translations by running app with different LANG settings
-- **Key Patterns**: Connection status messages like "Starting Tailscale connection..." need translation coverage
-- **Format String Safety**: Use `fmt.Errorf("%s", T("key"))` instead of `fmt.Errorf(T("key"))` to avoid go vet warnings
+### SSH Connection Flow
+1. **Parse target**: `parseSSHTarget()` handles `[user@]host[:port]` syntax
+2. **Validate inputs**: Security validation for user, host, port
+3. **Initialize tsnet**: Set up Tailscale connection
+4. **Establish SSH**: Connect using internal SSH client
+5. **Session mode**: Either execute command or start interactive shell
 
-### CLI Framework (Cobra/Fang)
-- **Text Rendering Issue**: Cobra/Fang may strip spaces from Example fields in help text
-- **Workaround Patterns**: Use non-breaking spaces or alternative formatting for help examples
-- **Translation Integration**: Example text should be translated and may need language-specific formatting
+### SCP Transfer Flow
+1. **Parse arguments**: Determine local vs remote paths
+2. **Detect direction**: Upload or download
+3. **Parse remote target**: Extract user, host, port
+4. **Initialize tsnet**: Same as SSH
+5. **Perform transfer**: Use SCP client library
 
 ### Code Organization Best Practices
-- **Function Extraction**: Break large functions into smaller, focused helpers (e.g., `initTsNet()` refactored into multiple helper functions)
-- **Error Handling**: Use consistent error wrapping patterns with translated messages
-- **Logger Management**: Distinguish between verbose debug logging and user-facing messages
-- **Terminal State**: Centralize terminal state management for consistent behavior across interactive sessions
+- **Single responsibility**: Each function does one thing well
+- **Minimal abstraction**: Avoid over-engineering
+- **Clear naming**: Function names describe what they do
+- **Error handling**: Use `fmt.Errorf` with clear messages
+- **No magic**: Explicit is better than implicit
 
 ## Debugging Workflows
 
 ### Authentication Issues
-1. Check if auth URL appears in verbose mode: `./ts-ssh connect -v target`
-2. Verify UserLogf configuration in tsnet_handler.go
-3. Test logger output destination (should be stderr, not io.Discard)
+1. Run with verbose mode: `./ts-ssh -v hostname`
+2. Check for auth URL in output
+3. Visit the URL to authenticate
+4. Retry connection
 
-### Missing Translations
-1. Extract all translation keys: `rg "T\(\"[^\"]*\"\)" -o -h --no-filename | sort | uniq`
-2. Test different languages: `LANG=es ./ts-ssh --help`
-3. Look for untranslated strings in output (they appear as key names)
+### Connection Issues
+1. Verify hostname is on your Tailnet
+2. Check if Tailscale is configured: `~/.config/ts-ssh/`
+3. Test with verbose mode for detailed logs
+4. Ensure port is correct (default: 22)
 
-### CLI Rendering Issues
-1. Check help output formatting: `./ts-ssh --help`
-2. Verify example text spacing in different languages
-3. Test both modern and legacy CLI modes
+### SCP Issues
+1. Verify syntax: `ts-ssh -scp source dest`
+2. Check that exactly one path is remote (`host:path`)
+3. Ensure remote path uses colon notation
+4. Test with verbose mode
 
 ## Development Workflow
 
@@ -242,15 +230,40 @@ go vet ./...
 # Run comprehensive tests
 go test ./...
 
-# Check for translation issues
-for lang in es zh hi ar bn pt ru ja de fr; do
-    echo "Testing $lang..."
-    LANG=$lang ./ts-ssh --help | head -10
-done
+# Build to ensure no errors
+go build -o ts-ssh .
+
+# Test basic functionality
+./ts-ssh --help
+./ts-ssh --version
 ```
 
+### Adding New Features
+1. **Ask: Is this necessary?** - Keep it simple
+2. **Keep it small** - Avoid adding bloat
+3. **Test it** - Add tests for new functionality
+4. **Document it** - Update help text and examples
+5. **Maintain compatibility** - Don't break existing usage
+
 ### Code Quality Checks
-- Run `go vet ./...` to catch format string issues
+- Run `go vet ./...` to catch potential issues
 - Use `golangci-lint run` for comprehensive linting
-- Test auth URL display in both verbose and non-verbose modes
-- Validate translation coverage for new user-facing messages
+- Test with and without `-v` flag
+- Verify security validation is working
+
+## Historical Context
+
+This codebase was simplified from a complex multi-modal CLI with:
+- Dual CLI modes (modern/legacy)
+- 11-language internationalization
+- Charmbracelet UI framework
+- Multiple subcommands (connect, list, multi, exec, copy, pick)
+- ~15,000 lines of code
+
+The simplification reduced it to ~4,656 lines while maintaining core functionality:
+- SSH connections
+- SCP file transfers
+- Tailscale integration
+- Security features
+
+The old complex code is preserved in `_old_complex/` for reference.

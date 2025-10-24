@@ -4,165 +4,183 @@ import (
 	"testing"
 )
 
-func TestParseTarget(t *testing.T) {
+func TestParseSSHTarget(t *testing.T) {
 	tests := []struct {
-		name         string
-		target       string
-		expectedHost string
-		expectedPort string
-		expectErr    bool
+		name        string
+		target      string
+		defaultUser string
+		defaultPort string
+		wantUser    string
+		wantHost    string
+		wantPort    string
+		wantErr     bool
 	}{
 		{
-			name:         "hostname only",
-			target:       "myhost",
-			expectedHost: "myhost",
-			expectedPort: DefaultSshPort, // "22"
-			expectErr:    false,
+			name:        "hostname only",
+			target:      "myhost",
+			defaultUser: "testuser",
+			defaultPort: "22",
+			wantUser:    "testuser",
+			wantHost:    "myhost",
+			wantPort:    "22",
 		},
 		{
-			name:         "hostname with user",
-			target:       "user@myhost",
-			expectedHost: "user@myhost", // parseTarget itself doesn't split user, main does
-			expectedPort: DefaultSshPort,
-			expectErr:    false,
+			name:        "user@hostname",
+			target:      "alice@myhost",
+			defaultUser: "testuser",
+			defaultPort: "22",
+			wantUser:    "alice",
+			wantHost:    "myhost",
+			wantPort:    "22",
 		},
 		{
-			name:         "hostname with port",
-			target:       "myhost:2222",
-			expectedHost: "myhost",
-			expectedPort: "2222",
-			expectErr:    false,
+			name:        "hostname:port",
+			target:      "myhost:2222",
+			defaultUser: "testuser",
+			defaultPort: "22",
+			wantUser:    "testuser",
+			wantHost:    "myhost",
+			wantPort:    "2222",
 		},
 		{
-			name:         "hostname with user and port",
-			target:       "user@myhost:2222",
-			expectedHost: "user@myhost", // parseTarget itself doesn't split user
-			expectedPort: "2222",
-			expectErr:    false,
+			name:        "user@hostname:port",
+			target:      "alice@myhost:2222",
+			defaultUser: "testuser",
+			defaultPort: "22",
+			wantUser:    "alice",
+			wantHost:    "myhost",
+			wantPort:    "2222",
 		},
 		{
-			name:         "ipv4 address",
-			target:       "192.168.1.1",
-			expectedHost: "192.168.1.1",
-			expectedPort: DefaultSshPort,
-			expectErr:    false,
+			name:        "ipv4 address",
+			target:      "192.168.1.1",
+			defaultUser: "testuser",
+			defaultPort: "22",
+			wantUser:    "testuser",
+			wantHost:    "192.168.1.1",
+			wantPort:    "22",
 		},
 		{
-			name:         "ipv4 address with port",
-			target:       "192.168.1.1:2222",
-			expectedHost: "192.168.1.1",
-			expectedPort: "2222",
-			expectErr:    false,
+			name:        "ipv4:port",
+			target:      "192.168.1.1:2222",
+			defaultUser: "testuser",
+			defaultPort: "22",
+			wantUser:    "testuser",
+			wantHost:    "192.168.1.1",
+			wantPort:    "2222",
 		},
 		{
-			name:         "ipv6 address",
-			target:       "[::1]",
-			expectedHost: "::1",
-			expectedPort: DefaultSshPort,
-			expectErr:    false,
+			name:        "ipv6 address",
+			target:      "[::1]",
+			defaultUser: "testuser",
+			defaultPort: "22",
+			wantUser:    "testuser",
+			wantHost:    "::1",
+			wantPort:    "22",
 		},
 		{
-			name:         "ipv6 address with port",
-			target:       "[::1]:2222",
-			expectedHost: "::1",
-			expectedPort: "2222",
-			expectErr:    false,
+			name:        "ipv6:port",
+			target:      "[::1]:2222",
+			defaultUser: "testuser",
+			defaultPort: "22",
+			wantUser:    "testuser",
+			wantHost:    "::1",
+			wantPort:    "2222",
 		},
 		{
-			name:         "invalid port",
-			target:       "myhost:abc",
-			expectedHost: "",
-			expectedPort: "",
-			expectErr:    true,
+			name:        "empty target",
+			target:      "",
+			defaultUser: "testuser",
+			defaultPort: "22",
+			wantErr:     true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			host, port, err := parseTarget(tt.target, DefaultSshPort)
+			user, host, port, err := parseSSHTarget(tt.target, tt.defaultUser, tt.defaultPort)
 
-			if (err != nil) != tt.expectErr {
-				t.Errorf("parseTarget() error = %v, expectErr %v", err, tt.expectErr)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("parseSSHTarget() expected error, got nil")
+				}
 				return
 			}
-			if !tt.expectErr {
-				if host != tt.expectedHost {
-					t.Errorf("parseTarget() host = %v, want %v", host, tt.expectedHost)
-				}
-				if port != tt.expectedPort {
-					t.Errorf("parseTarget() port = %v, want %v", port, tt.expectedPort)
-				}
+
+			if err != nil {
+				t.Errorf("parseSSHTarget() unexpected error: %v", err)
+				return
+			}
+
+			if user != tt.wantUser {
+				t.Errorf("parseSSHTarget() user = %v, want %v", user, tt.wantUser)
+			}
+			if host != tt.wantHost {
+				t.Errorf("parseSSHTarget() host = %v, want %v", host, tt.wantHost)
+			}
+			if port != tt.wantPort {
+				t.Errorf("parseSSHTarget() port = %v, want %v", port, tt.wantPort)
 			}
 		})
 	}
 }
 
-func TestParseScpRemoteArg(t *testing.T) {
+func TestParseSCPArg(t *testing.T) {
 	tests := []struct {
-		name           string
-		remoteArg      string
-		defaultSSHUser string
-		expectedHost   string
-		expectedPath   string
-		expectedUser   string
-		expectErr      bool
+		name     string
+		arg      string
+		wantHost string
+		wantPath string
+		isRemote bool
 	}{
 		{
-			name:           "host:path",
-			remoteArg:      "myhost:/tmp/file",
-			defaultSSHUser: "defaultuser",
-			expectedHost:   "myhost",
-			expectedPath:   "/tmp/file",
-			expectedUser:   "defaultuser",
-			expectErr:      false,
+			name:     "local path",
+			arg:      "/tmp/file.txt",
+			wantHost: "",
+			wantPath: "/tmp/file.txt",
+			isRemote: false,
 		},
 		{
-			name:           "user@host:path",
-			remoteArg:      "alice@myhost:/tmp/file",
-			defaultSSHUser: "defaultuser",
-			expectedHost:   "myhost",
-			expectedPath:   "/tmp/file",
-			expectedUser:   "alice",
-			expectErr:      false,
+			name:     "relative path",
+			arg:      "file.txt",
+			wantHost: "",
+			wantPath: "file.txt",
+			isRemote: false,
 		},
 		{
-			name:           "missing path",
-			remoteArg:      "myhost:",
-			defaultSSHUser: "defaultuser",
-			expectedHost:   "",
-			expectedPath:   "",
-			expectedUser:   "",
-			expectErr:      true,
+			name:     "remote path",
+			arg:      "host:/tmp/file.txt",
+			wantHost: "host",
+			wantPath: "/tmp/file.txt",
+			isRemote: true,
 		},
 		{
-			name:           "missing colon",
-			remoteArg:      "myhost",
-			defaultSSHUser: "defaultuser",
-			expectedHost:   "",
-			expectedPath:   "",
-			expectedUser:   "",
-			expectErr:      true,
+			name:     "remote with user",
+			arg:      "user@host:/tmp/file.txt",
+			wantHost: "user@host",
+			wantPath: "/tmp/file.txt",
+			isRemote: true,
+		},
+		{
+			name:     "windows drive letter",
+			arg:      "C:\\Users\\test\\file.txt",
+			wantHost: "",
+			wantPath: "C:\\Users\\test\\file.txt",
+			isRemote: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			host, path, user, err := parseScpRemoteArg(tt.remoteArg, tt.defaultSSHUser)
-
-			if (err != nil) != tt.expectErr {
-				t.Errorf("parseScpRemoteArg() error = %v, expectErr %v", err, tt.expectErr)
-				return
+			host, path, isRemote := parseSCPArg(tt.arg)
+			if host != tt.wantHost {
+				t.Errorf("parseSCPArg() host = %v, want %v", host, tt.wantHost)
 			}
-			if !tt.expectErr {
-				if host != tt.expectedHost {
-					t.Errorf("parseScpRemoteArg() host = %v, want %v", host, tt.expectedHost)
-				}
-				if path != tt.expectedPath {
-					t.Errorf("parseScpRemoteArg() path = %v, want %v", path, tt.expectedPath)
-				}
-				if user != tt.expectedUser {
-					t.Errorf("parseScpRemoteArg() user = %v, want %v", user, tt.expectedUser)
-				}
+			if path != tt.wantPath {
+				t.Errorf("parseSCPArg() path = %v, want %v", path, tt.wantPath)
+			}
+			if isRemote != tt.isRemote {
+				t.Errorf("parseSCPArg() isRemote = %v, want %v", isRemote, tt.isRemote)
 			}
 		})
 	}
@@ -199,98 +217,39 @@ func TestConstants(t *testing.T) {
 	}
 }
 
-func TestParseHostList(t *testing.T) {
+func TestExtractURL(t *testing.T) {
 	tests := []struct {
-		name     string
-		args     []string
-		expected []string
+		name string
+		msg  string
+		want string
 	}{
 		{
-			name:     "empty args",
-			args:     []string{},
-			expected: nil,
+			name: "URL in middle of message",
+			msg:  "Please visit https://login.tailscale.com/a/123 to authenticate",
+			want: "https://login.tailscale.com/a/123",
 		},
 		{
-			name:     "single host",
-			args:     []string{"host1"},
-			expected: []string{"host1"},
+			name: "URL at start",
+			msg:  "https://login.tailscale.com/a/456",
+			want: "https://login.tailscale.com/a/456",
 		},
 		{
-			name:     "comma separated hosts",
-			args:     []string{"host1,host2,host3"},
-			expected: []string{"host1", "host2", "host3"},
+			name: "No URL",
+			msg:  "No URL here",
+			want: "No URL here",
 		},
 		{
-			name:     "mixed args",
-			args:     []string{"host1", "host2,host3", "host4"},
-			expected: []string{"host1", "host2", "host3", "host4"},
-		},
-		{
-			name:     "hosts with spaces",
-			args:     []string{" host1 ", "host2, host3 "},
-			expected: []string{"host1", "host2", "host3"},
+			name: "URL with newline",
+			msg:  "Visit https://example.com\nfor more info",
+			want: "https://example.com",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := parseHostList(tt.args)
-			if len(result) != len(tt.expected) {
-				t.Errorf("parseHostList() length = %v, want %v", len(result), len(tt.expected))
-				return
-			}
-			for i, host := range result {
-				if host != tt.expected[i] {
-					t.Errorf("parseHostList()[%d] = %v, want %v", i, host, tt.expected[i])
-				}
-			}
-		})
-	}
-}
-
-func TestIsPowerCLIMode(t *testing.T) {
-	tests := []struct {
-		name     string
-		config   *AppConfig
-		expected bool
-	}{
-		{
-			name:     "no flags set",
-			config:   &AppConfig{},
-			expected: false,
-		},
-		{
-			name:     "list hosts",
-			config:   &AppConfig{ListHosts: true},
-			expected: true,
-		},
-		{
-			name:     "multi hosts",
-			config:   &AppConfig{MultiHosts: "host1,host2"},
-			expected: true,
-		},
-		{
-			name:     "exec command",
-			config:   &AppConfig{ExecCmd: "ls -la"},
-			expected: true,
-		},
-		{
-			name:     "copy files",
-			config:   &AppConfig{CopyFiles: "file host:/path"},
-			expected: true,
-		},
-		{
-			name:     "pick host",
-			config:   &AppConfig{PickHost: true},
-			expected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isPowerCLIMode(tt.config)
-			if result != tt.expected {
-				t.Errorf("isPowerCLIMode() = %v, want %v", result, tt.expected)
+			got := extractURL(tt.msg)
+			if got != tt.want {
+				t.Errorf("extractURL() = %v, want %v", got, tt.want)
 			}
 		})
 	}
