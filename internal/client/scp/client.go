@@ -16,7 +16,6 @@ import (
 
 	sshclient "github.com/derekg/ts-ssh/internal/client/ssh"
 	"github.com/derekg/ts-ssh/internal/config"
-	"github.com/derekg/ts-ssh/internal/i18n"
 	"github.com/derekg/ts-ssh/internal/security"
 )
 
@@ -48,7 +47,7 @@ func HandleCliScp(
 		targetHost, sshUser, localPath, remotePath, isUpload, sshKeyPath)
 
 	if localPath == "" || remotePath == "" {
-		return errors.New(i18n.T("scp_empty_path"))
+		return errors.New("empty local or remote path")
 	}
 
 	// Ensure defaultSSHPort is accessible. For now, define locally if not shared.
@@ -71,7 +70,7 @@ func HandleCliScp(
 	}
 
 	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		fmt.Print(i18n.T("scp_enter_password", sshUser, targetHost))
+		fmt.Printf("Enter password for %s@%s: ", sshUser, targetHost)
 		password, passErr := security.ReadPasswordSecurely()
 		fmt.Println()
 		if passErr != nil {
@@ -83,7 +82,7 @@ func HandleCliScp(
 	var hostKeyCallback ssh.HostKeyCallback
 	var hkErr error
 	if insecureHostKey {
-		logger.Println(i18n.T("scp_host_key_warning"))
+		logger.Println("WARNING: Skipping host key verification (insecure)")
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	} else {
 		// Call the exported function from ssh_client.go
@@ -143,7 +142,7 @@ func HandleCliScp(
 		if errCopy != nil {
 			return fmt.Errorf("CLI SCP: error uploading file: %w", errCopy)
 		}
-		logger.Println(i18n.T("scp_upload_complete"))
+		logger.Println("Upload complete")
 	} else { // Download
 		logger.Printf("CLI SCP: Downloading %s@%s:%s to %s", sshUser, targetHost, remotePath, localPath)
 
@@ -166,7 +165,7 @@ func HandleCliScp(
 			}
 			return fmt.Errorf("CLI SCP: error downloading file: %w", errCopy)
 		}
-		logger.Println(i18n.T("scp_download_complete"))
+		logger.Println("Download complete")
 	}
 	return nil
 }

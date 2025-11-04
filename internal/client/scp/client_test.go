@@ -6,8 +6,6 @@ import (
 	"log"
 	"os/user"
 	"testing"
-
-	"github.com/derekg/ts-ssh/internal/i18n"
 )
 
 // TestConstants verifies SCP constants are defined correctly
@@ -18,50 +16,6 @@ func TestConstants(t *testing.T) {
 
 	if DefaultSshPort != "22" {
 		t.Errorf("DefaultSshPort should be '22', got '%s'", DefaultSshPort)
-	}
-}
-
-// TestTranslationFunction tests the T function
-func TestTranslationFunction(t *testing.T) {
-	tests := []struct {
-		name     string
-		key      string
-		args     []interface{}
-		expected string
-	}{
-		{
-			name:     "empty path message",
-			key:      "scp_empty_path",
-			args:     nil,
-			expected: "SCP path cannot be empty",
-		},
-		{
-			name:     "password prompt with args",
-			key:      "scp_enter_password",
-			args:     []interface{}{"user", "host"},
-			expected: "Enter password for user@host: ",
-		},
-		{
-			name:     "dial via tsnet",
-			key:      "dial_via_tsnet",
-			args:     nil,
-			expected: "Connecting via tsnet...",
-		},
-		{
-			name:     "unknown key returns key",
-			key:      "unknown_key",
-			args:     nil,
-			expected: "unknown_key",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := i18n.T(tt.key, tt.args...)
-			if result != tt.expected {
-				t.Errorf("T(%s, %v) = %s, want %s", tt.key, tt.args, result, tt.expected)
-			}
-		})
 	}
 }
 
@@ -83,21 +37,21 @@ func TestHandleCliScpValidation(t *testing.T) {
 			localPath:      "",
 			remotePath:     "/remote/path",
 			expectError:    true,
-			errorSubstring: "SCP path cannot be empty",
+			errorSubstring: "empty local or remote path",
 		},
 		{
 			name:           "empty remote path",
 			localPath:      "/local/path",
 			remotePath:     "",
 			expectError:    true,
-			errorSubstring: "SCP path cannot be empty",
+			errorSubstring: "empty local or remote path",
 		},
 		{
 			name:           "both paths empty",
 			localPath:      "",
 			remotePath:     "",
 			expectError:    true,
-			errorSubstring: "SCP path cannot be empty",
+			errorSubstring: "empty local or remote path",
 		},
 	}
 
@@ -163,7 +117,7 @@ func TestScpErrorHandling(t *testing.T) {
 	}
 
 	// Error should be about empty paths
-	if err.Error() != "SCP path cannot be empty" {
+	if err.Error() != "empty local or remote path" {
 		t.Errorf("Expected validation error, got: %s", err.Error())
 	}
 }
@@ -195,7 +149,7 @@ func TestScpFunctionSignature(t *testing.T) {
 	if err == nil {
 		t.Error("Expected validation error")
 	}
-	if err.Error() != "SCP path cannot be empty" {
+	if err.Error() != "empty local or remote path" {
 		t.Error("Should get validation error with empty path")
 	}
 }
@@ -229,7 +183,7 @@ func TestScpWithSSHKeyPath(t *testing.T) {
 	}
 
 	// Should be a validation error
-	if err.Error() != "SCP path cannot be empty" {
+	if err.Error() != "empty local or remote path" {
 		t.Errorf("Expected validation error, got: %s", err.Error())
 	}
 }
@@ -262,7 +216,7 @@ func TestScpInsecureMode(t *testing.T) {
 	}
 
 	// Should be validation error
-	if err.Error() != "SCP path cannot be empty" {
+	if err.Error() != "empty local or remote path" {
 		t.Errorf("Expected validation error, got: %s", err.Error())
 	}
 }

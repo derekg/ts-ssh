@@ -30,4 +30,3 @@ Thumbs.db
 # If your default is ~/.config/ts-ssh-client, this isn't strictly needed here.
 # If you use the fallback ts-ssh-client-state, add it:
 ts-ssh-client-state/
-old_complex/
