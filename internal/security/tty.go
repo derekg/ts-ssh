@@ -6,8 +6,6 @@ import (
 	"os"
 
 	"golang.org/x/term"
-
-	"github.com/derekg/ts-ssh/internal/i18n"
 )
 
 // getSecureTTY validates and opens a secure TTY connection
@@ -15,7 +13,7 @@ import (
 func getSecureTTY() (*os.File, error) {
 	// First, verify we're running in a real terminal
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		return nil, errors.New(i18n.T("not_running_in_terminal"))
+		return nil, errors.New("not running in a terminal")
 	}
 
 	// Get TTY path with validation
@@ -26,13 +24,13 @@ func getSecureTTY() (*os.File, error) {
 
 	// Validate TTY security before opening
 	if err := validateTTYSecurity(ttyPath); err != nil {
-		return nil, fmt.Errorf(i18n.T("tty_security_validation_failed"), err)
+		return nil, fmt.Errorf("TTY security validation failed: %w", err)
 	}
 
 	// Open TTY with explicit permissions check
 	ttyFile, err := os.OpenFile(ttyPath, os.O_RDWR, 0)
 	if err != nil {
-		return nil, fmt.Errorf(i18n.T("failed_open_tty"), err)
+		return nil, fmt.Errorf("failed to open TTY: %w", err)
 	}
 
 	// Additional security check after opening

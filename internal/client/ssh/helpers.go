@@ -13,7 +13,6 @@ import (
 
 	"github.com/derekg/ts-ssh/internal/config"
 	"github.com/derekg/ts-ssh/internal/crypto/pqc"
-	"github.com/derekg/ts-ssh/internal/i18n"
 )
 
 // Constants needed by SSH package
@@ -88,7 +87,7 @@ func createSSHConfig(config SSHConnectionConfig) (*ssh.ClientConfig, error) {
 	var hostKeyCallback ssh.HostKeyCallback
 	if config.InsecureHostKey {
 		if config.Logger != nil {
-			config.Logger.Printf("%s", i18n.T("host_key_warning"))
+			config.Logger.Printf("WARNING: Skipping host key verification (insecure)")
 		}
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	} else {
@@ -151,26 +150,26 @@ func EstablishSSHConnection(srv *tsnet.Server, ctx context.Context, config SSHCo
 	sshTargetAddr := net.JoinHostPort(config.TargetHost, config.TargetPort)
 
 	if config.Logger != nil {
-		config.Logger.Printf("%s", i18n.T("dial_via_tsnet"))
+		config.Logger.Printf("Dialing via tsnet...")
 	}
 
 	// Dial via tsnet
 	conn, err := srv.Dial(ctx, "tcp", sshTargetAddr)
 	if err != nil {
-		return nil, fmt.Errorf("%s", i18n.T("dial_failed"))
+		return nil, fmt.Errorf("tsnet dial failed")
 	}
 
 	// Establish SSH connection
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, sshTargetAddr, sshConfig)
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("%s: %w", i18n.T("ssh_connection_failed"), err)
+		return nil, fmt.Errorf("SSH connection failed: %w", err)
 	}
 
 	client := ssh.NewClient(sshConn, chans, reqs)
 
 	if config.Logger != nil {
-		config.Logger.Printf("%s", i18n.T("ssh_connection_established"))
+		config.Logger.Printf("SSH connection established")
 	}
 
 	return client, nil
