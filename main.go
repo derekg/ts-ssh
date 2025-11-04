@@ -41,6 +41,7 @@ func main() {
 		insecure    = flag.Bool("insecure", false, "Skip host key verification (insecure)")
 		scpMode     = flag.Bool("scp", false, "SCP mode: ts-ssh -scp source dest")
 		showVersion = flag.Bool("version", false, "Show version")
+		disablePTY  = flag.Bool("T", false, "Disable pseudo-terminal allocation")
 	)
 
 	flag.Usage = usage
@@ -85,7 +86,7 @@ func main() {
 		remoteCmd = args[1:]
 	}
 
-	if err := runSSH(target, remoteCmd, *sshUser, *sshPort, *keyPath, *tsnetDir, *controlURL, *insecure, *verbose, logger); err != nil {
+	if err := runSSH(target, remoteCmd, *sshUser, *sshPort, *keyPath, *tsnetDir, *controlURL, *insecure, *disablePTY, *verbose, logger); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -106,7 +107,7 @@ func usage() {
 }
 
 // runSSH handles the SSH connection
-func runSSH(target string, remoteCmd []string, defaultUser, defaultPort, keyPath, tsnetDir, controlURL string, insecure, verbose bool, logger *log.Logger) error {
+func runSSH(target string, remoteCmd []string, defaultUser, defaultPort, keyPath, tsnetDir, controlURL string, insecure, disablePTY, verbose bool, logger *log.Logger) error {
 	// Parse target: [user@]host[:port]
 	sshUser, host, port, err := parseSSHTarget(target, defaultUser, defaultPort)
 	if err != nil {
@@ -142,7 +143,7 @@ func runSSH(target string, remoteCmd []string, defaultUser, defaultPort, keyPath
 		return execRemoteCommand(client, remoteCmd, logger)
 	}
 
-	return interactiveSession(client, logger)
+	return interactiveSession(client, disablePTY, logger)
 }
 
 // runSCP handles SCP file transfer
@@ -366,7 +367,7 @@ func execRemoteCommand(client *ssh.Client, cmd []string, logger *log.Logger) err
 }
 
 // interactiveSession starts an interactive SSH session
-func interactiveSession(client *ssh.Client, logger *log.Logger) error {
+func interactiveSession(client *ssh.Client, disablePTY bool, logger *log.Logger) error {
 	session, err := client.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
@@ -381,9 +382,9 @@ func interactiveSession(client *ssh.Client, logger *log.Logger) error {
 	session.Stdout = os.Stdout
 	session.Stderr = os.Stderr
 
-	// Setup PTY if we're in a terminal
+	// Setup PTY if we're in a terminal and PTY is not disabled
 	fd := int(os.Stdin.Fd())
-	if term.IsTerminal(fd) {
+	if !disablePTY && term.IsTerminal(fd) {
 		// Get terminal size
 		width, height, err := term.GetSize(fd)
 		if err != nil {
