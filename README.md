@@ -11,8 +11,10 @@ A streamlined command-line SSH client and SCP utility that connects to your Tail
 - **Standard SSH syntax**: Works just like regular `ssh`
 - **SCP file transfers**: Simple `-scp` flag for file operations
 - **Interactive SSH sessions** with full PTY support
+- **SOCKS5 dynamic port forwarding**: `-D` flag for proxy support (VSCode Remote SSH compatible)
 - **Secure host key verification** using `~/.ssh/known_hosts`
 - **Multiple authentication methods**: SSH keys, password prompts
+- **Flexible username support**: Allows dots in usernames (e.g., `first.last`)
 
 ### 🛠️ Technical Features
 - **Cross-platform**: Linux, macOS (Intel/ARM), Windows, FreeBSD, OpenBSD
@@ -81,6 +83,9 @@ Usage: ts-ssh [options] [user@]host[:port] [command...]
 SSH over Tailscale without requiring a full Tailscale daemon
 
 Options:
+  -D string
+        SOCKS5 dynamic port forwarding on [bind_address:]port
+  -T    Disable pseudo-terminal allocation
   -control-url string
         Tailscale control server URL
   -i string
@@ -168,6 +173,48 @@ ts-ssh -insecure hostname
 
 # Custom Tailscale control URL
 ts-ssh -control-url https://controlplane.tailscale.com hostname
+```
+
+### SOCKS5 Dynamic Port Forwarding
+
+Use the `-D` flag to set up a SOCKS5 proxy for forwarding connections through the SSH tunnel. This is particularly useful for tools like VSCode Remote SSH.
+
+```bash
+# Start SOCKS5 proxy on localhost:1080
+ts-ssh -D 1080 hostname
+
+# Bind to specific address and port
+ts-ssh -D localhost:1080 hostname
+ts-ssh -D 127.0.0.1:8080 hostname
+
+# Bind to all interfaces (WARNING: exposes proxy to network)
+ts-ssh -D 0.0.0.0:1080 hostname
+
+# Use with verbose mode to see proxy connections
+ts-ssh -v -D 1080 hostname
+
+# Combine with other options
+ts-ssh -D 1080 -p 2222 user@hostname
+```
+
+**Security Notes:**
+- Binding to `localhost`, `127.0.0.1`, or `::1` is safe (proxy only accessible locally)
+- Binding to `0.0.0.0` or specific network IPs exposes the proxy to your network
+- The tool will warn you when binding to non-localhost addresses
+
+### Disable PTY Allocation
+
+Use the `-T` flag to disable pseudo-terminal allocation. Useful for non-interactive commands and automation:
+
+```bash
+# Run command without PTY (like ssh -T)
+ts-ssh -T hostname "cat /etc/hostname"
+
+# Useful for piping output
+ts-ssh -T hostname "journalctl -f" | grep error
+
+# Combine with other flags
+ts-ssh -T -p 2222 hostname uptime
 ```
 
 ## Tailscale Authentication

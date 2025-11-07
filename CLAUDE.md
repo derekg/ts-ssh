@@ -26,8 +26,11 @@ ts-ssh -scp source dest
 ### Core Features
 - **SSH Connection**: Just like `ssh`, connect to any host on your Tailnet
 - **SCP Transfer**: Simple file transfer with `-scp` flag
+- **SOCKS5 Proxy**: `-D` flag for dynamic port forwarding (VSCode Remote SSH compatible)
 - **Port Specification**: Use `-p` flag or `host:port` syntax
+- **PTY Control**: `-T` flag to disable pseudo-terminal allocation
 - **Verbose Mode**: `-v` for debugging and authentication URLs
+- **Flexible Usernames**: Supports dots in usernames (e.g., `first.last`)
 
 ### No Subcommands
 - No complex subcommand structure
@@ -94,11 +97,16 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ts-ssh-linux-amd64 .
 ./ts-ssh -scp file.txt hostname:/tmp/
 ./ts-ssh -scp hostname:/tmp/file.txt ./downloads/
 
+# SOCKS5 dynamic port forwarding
+./ts-ssh -D 1080 hostname            # SOCKS proxy on localhost:1080
+./ts-ssh -D 0.0.0.0:1080 hostname    # Bind to all interfaces (with warning)
+
 # With options
 ./ts-ssh -v hostname                  # Verbose mode
 ./ts-ssh -p 2222 hostname            # Custom port
-./ts-ssh -l alice hostname           # Specify username
+./ts-ssh -l alice hostname           # Specify username (supports dots: first.last)
 ./ts-ssh -i ~/.ssh/custom_key hostname  # Custom key
+./ts-ssh -T hostname "cat /etc/hostname"  # Disable PTY allocation
 
 # Get help
 ./ts-ssh --help
@@ -124,9 +132,9 @@ The following were removed to simplify the codebase:
 
 ```
 ts-ssh/
-├── main.go              # ~457 lines - main CLI logic
+├── main.go              # ~700 lines - main CLI logic + SOCKS5
 ├── constants.go         # ~52 lines - constants
-├── main_test.go         # ~256 lines - tests
+├── main_test.go         # ~850 lines - tests (including SOCKS5 tests)
 └── internal/
     ├── client/
     │   ├── scp/         # SCP client implementation
@@ -138,7 +146,7 @@ ts-ssh/
     └── security/        # Security validation
 ```
 
-**Total**: ~4,656 lines (down from 15,000 - 69% reduction)
+**Total**: ~5,250 lines (including SOCKS5 proxy support and comprehensive tests)
 
 ## Code Quality Standards
 
@@ -219,6 +227,12 @@ go vet ./...
 3. Ensure remote path uses colon notation
 4. Test with verbose mode
 
+### SOCKS5 Proxy Issues
+1. Verify port is available: `netstat -an | grep 1080`
+2. Check bind address security warnings
+3. Test with verbose mode: `./ts-ssh -v -D 1080 hostname`
+4. Verify proxy is listening: `curl --socks5 localhost:1080 http://example.com`
+
 ## Development Workflow
 
 ### Before Committing
@@ -260,10 +274,28 @@ This codebase was simplified from a complex multi-modal CLI with:
 - Multiple subcommands (connect, list, multi, exec, copy, pick)
 - ~15,000 lines of code
 
-The simplification reduced it to ~4,656 lines while maintaining core functionality:
+The simplification reduced it to ~5,250 lines while maintaining and extending core functionality:
 - SSH connections
 - SCP file transfers
+- SOCKS5 dynamic port forwarding (new in recent updates)
+- PTY allocation control (new in recent updates)
+- Flexible username validation (now supports dots)
 - Tailscale integration
-- Security features
+- Security features with comprehensive testing
 
 The old complex code is preserved in `_old_complex/` for reference.
+
+## Recent Changes
+
+### SOCKS5 Dynamic Port Forwarding (PR #33)
+- Added `-D [bind_address:]port` flag for SOCKS5 proxy support
+- Full SOCKS5 protocol implementation (handshake, IPv4/IPv6/domain names)
+- Security validation for bind addresses
+- Context-based lifecycle management for graceful shutdown
+- Comprehensive test coverage for SOCKS5 functionality
+- Compatible with VSCode Remote SSH and other tools requiring SOCKS proxies
+
+### Username Validation Enhancement (PR #34)
+- Updated SSH username validation to allow dots (e.g., `first.last`)
+- Common Unix username format now fully supported
+- Added test cases for dot-containing usernames
