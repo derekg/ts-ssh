@@ -33,16 +33,16 @@ func main() {
 
 	// Parse flags
 	var (
-		sshUser       = flag.String("l", currentUsername(), "SSH username")
-		sshPort       = flag.String("p", "22", "SSH port")
-		keyPath       = flag.String("i", defaultKeyPath(), "SSH private key path")
-		tsnetDir      = flag.String("tsnet-dir", defaultTsnetDir(), "Tailscale state directory")
-		controlURL    = flag.String("control-url", "", "Tailscale control server URL")
-		verbose       = flag.Bool("v", false, "Verbose output")
-		insecure      = flag.Bool("insecure", false, "Skip host key verification (insecure)")
-		scpMode       = flag.Bool("scp", false, "SCP mode: ts-ssh -scp source dest")
-		showVersion   = flag.Bool("version", false, "Show version")
-		disablePTY    = flag.Bool("T", false, "Disable pseudo-terminal allocation")
+		sshUser        = flag.String("l", currentUsername(), "SSH username")
+		sshPort        = flag.String("p", "22", "SSH port")
+		keyPath        = flag.String("i", defaultKeyPath(), "SSH private key path")
+		tsnetDir       = flag.String("tsnet-dir", defaultTsnetDir(), "Tailscale state directory")
+		controlURL     = flag.String("control-url", "", "Tailscale control server URL")
+		verbose        = flag.Bool("v", false, "Verbose output")
+		insecure       = flag.Bool("insecure", false, "Skip host key verification (insecure)")
+		scpMode        = flag.Bool("scp", false, "SCP mode: ts-ssh -scp source dest")
+		showVersion    = flag.Bool("version", false, "Show version")
+		disablePTY     = flag.Bool("T", false, "Disable pseudo-terminal allocation")
 		dynamicForward = flag.String("D", "", "SOCKS5 dynamic port forwarding on [bind_address:]port")
 	)
 
@@ -487,6 +487,20 @@ func setupDynamicForward(client *ssh.Client, forwardSpec string, verbose bool, l
 		return fmt.Errorf("invalid port for dynamic forwarding: %w", err)
 	}
 
+	// Validate bind address for security
+	// Allow localhost, 127.0.0.1, ::1, and empty (defaults to all interfaces)
+	// Warn on binding to non-localhost addresses as they expose the proxy to network
+	if bindAddr != "" && bindAddr != "localhost" && bindAddr != "127.0.0.1" && bindAddr != "::1" {
+		// Parse to check if it's a valid IP
+		ip := net.ParseIP(bindAddr)
+		if ip == nil && bindAddr != "0.0.0.0" && bindAddr != "::" {
+			return fmt.Errorf("invalid bind address: %s", bindAddr)
+		}
+		if verbose {
+			logger.Printf("Warning: Binding SOCKS5 proxy to %s exposes it to the network\n", bindAddr)
+		}
+	}
+
 	listenAddr := net.JoinHostPort(bindAddr, port)
 
 	// Start listening on local port
@@ -499,16 +513,31 @@ func setupDynamicForward(client *ssh.Client, forwardSpec string, verbose bool, l
 		logger.Printf("SOCKS5 dynamic forwarding listening on %s\n", listenAddr)
 	}
 
+	// Create context for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+
 	// Handle incoming SOCKS5 connections in background
 	go func() {
 		defer listener.Close()
+		defer cancel()
 		for {
 			localConn, err := listener.Accept()
 			if err != nil {
-				if verbose {
-					logger.Printf("Error accepting connection: %v\n", err)
+				// Check if this is a normal shutdown or an error
+				select {
+				case <-ctx.Done():
+					// Context cancelled, normal shutdown
+					return
+				default:
+					// Check if listener was closed
+					if opErr, ok := err.(*net.OpError); ok && opErr.Err.Error() == "use of closed network connection" {
+						return
+					}
+					if verbose {
+						logger.Printf("Error accepting SOCKS5 connection: %v\n", err)
+					}
+					return
 				}
-				return
 			}
 			go handleSOCKS5(client, localConn, verbose, logger)
 		}
