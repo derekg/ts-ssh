@@ -188,10 +188,10 @@ func (iv *InputValidator) ValidateSSHUser(username string) error {
 		return fmt.Errorf("SSH username too long: %d characters (max %d)", len(username), MaxSSHUserLength)
 	}
 
-	// SSH usernames should only contain alphanumeric characters, hyphens, and underscores
-	validUserRegex := regexp.MustCompile(`^[a-zA-Z0-9_\-]+$`)
+	// SSH usernames should only contain alphanumeric characters, hyphens, underscores, and dots
+	validUserRegex := regexp.MustCompile(`^[a-zA-Z0-9_\-\.]+$`)
 	if !validUserRegex.MatchString(username) {
-		return fmt.Errorf("SSH username contains invalid characters (only alphanumeric, hyphen, underscore allowed)")
+		return fmt.Errorf("SSH username contains invalid characters (only alphanumeric, hyphen, underscore, dot allowed)")
 	}
 
 	// Cannot start with hyphen or number

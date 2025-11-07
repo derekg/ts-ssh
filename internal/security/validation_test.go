@@ -191,6 +191,8 @@ func TestValidateSSHUser(t *testing.T) {
 		{"valid_with_hyphen", "user-name", false, ""},
 		{"valid_with_numbers", "user123", false, ""},
 		{"valid_mixed", "my_user-123", false, ""},
+		{"valid_with_dot", "user.name", false, ""},
+		{"valid_with_multiple_dots", "first.last.name", false, ""},
 
 		// Invalid usernames
 		{"empty_username", "", true, "cannot be empty"},
@@ -199,7 +201,6 @@ func TestValidateSSHUser(t *testing.T) {
 		{"starts_with_number", "1user", true, "cannot start with hyphen or number"},
 		{"invalid_chars_space", "user name", true, "invalid characters"},
 		{"invalid_chars_special", "user@host", true, "invalid characters"},
-		{"invalid_chars_dot", "user.name", true, "invalid characters"},
 		{"invalid_chars_slash", "user/name", true, "invalid characters"},
 	}
 
