@@ -287,11 +287,24 @@ The old complex code is preserved in `_old_complex/` for reference.
 
 ## Recent Changes
 
+### Auth URL Display Fix
+- Fixed `UserLogf` filter that silently dropped re-auth URLs from custom control servers
+- Changed filter from hardcoded `login.tailscale.com` domain to any `https://` URL
+- `UserLogf` is the user-facing log channel; any HTTPS URL in it should be shown
+
+### SOCKS5 Protocol Correctness Fixes
+- Replaced raw `Read()` calls with `io.ReadFull()` for each protocol segment; TCP can fragment
+  messages across multiple reads, causing silent misparses under real network conditions
+- Removed dead `context.WithCancel` that was only ever cancelled by the goroutine's own defer
+  and was unreachable from outside — replaced opaque error string comparison with `errors.Is(err, net.ErrClosed)`
+- Simplified bidirectional copy to one background goroutine + current goroutine; when either
+  direction closes the deferred `Close()` tears down both sides cleanly
+- Used `net.JoinHostPort` for target address construction so IPv6 addresses get correct bracket notation
+
 ### SOCKS5 Dynamic Port Forwarding (PR #33)
 - Added `-D [bind_address:]port` flag for SOCKS5 proxy support
 - Full SOCKS5 protocol implementation (handshake, IPv4/IPv6/domain names)
 - Security validation for bind addresses
-- Context-based lifecycle management for graceful shutdown
 - Comprehensive test coverage for SOCKS5 functionality
 - Compatible with VSCode Remote SSH and other tools requiring SOCKS proxies
 

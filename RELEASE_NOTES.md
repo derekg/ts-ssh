@@ -1,5 +1,32 @@
 # ts-ssh Release Notes
 
+## Post-0.8.0 Bug Fixes
+
+Date: 2026-05-30
+
+### Bug Fixes
+
+- **Auth URL always displayed on re-authentication**
+  The `UserLogf` filter matched only `login.tailscale.com`, silently dropping re-auth URLs
+  from custom control servers and any future URL format changes. Widened to any `https://` URL
+  since `UserLogf` is the user-facing log channel.
+
+- **SOCKS5 protocol reads now use `io.ReadFull`**
+  Raw `Read()` calls assumed the entire SOCKS5 greeting and CONNECT request arrived in a single
+  TCP segment. Under real network conditions TCP can fragment messages; `io.ReadFull` reads each
+  protocol segment to the exact expected length regardless of fragmentation.
+
+- **SOCKS5 context leak removed**
+  The `context.WithCancel` in `setupDynamicForward` was only ever cancelled by the goroutine's
+  own `defer cancel()` and was unreachable from the caller — a no-op that added confusion.
+  Replaced the brittle error string comparison with `errors.Is(err, net.ErrClosed)`.
+
+- **SOCKS5 IPv6 target address now correctly bracketed**
+  `fmt.Sprintf("%s:%d", host, port)` produced invalid addresses for IPv6 hosts. Replaced with
+  `net.JoinHostPort` which adds brackets when needed.
+
+---
+
 ## Version 0.3.0 - Architecture Improvements and i18n
 
 Date: 2025-06-18

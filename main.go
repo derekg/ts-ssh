@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -304,7 +305,7 @@ func initTailscale(tsnetDir, controlURL string, verbose bool, logger *log.Logger
 		srv.Logf = func(string, ...interface{}) {}
 		srv.UserLogf = func(format string, args ...interface{}) {
 			msg := fmt.Sprintf(format, args...)
-			if strings.Contains(msg, "https://login.tailscale.com/") {
+			if strings.Contains(msg, "https://") {
 				fmt.Fprintf(os.Stderr, "\nTo authenticate, visit:\n%s\n\n", extractURL(msg))
 			}
 		}
@@ -513,31 +514,19 @@ func setupDynamicForward(client *ssh.Client, forwardSpec string, verbose bool, l
 		logger.Printf("SOCKS5 dynamic forwarding listening on %s\n", listenAddr)
 	}
 
-	// Create context for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-
 	// Handle incoming SOCKS5 connections in background
 	go func() {
 		defer listener.Close()
-		defer cancel()
 		for {
 			localConn, err := listener.Accept()
 			if err != nil {
-				// Check if this is a normal shutdown or an error
-				select {
-				case <-ctx.Done():
-					// Context cancelled, normal shutdown
-					return
-				default:
-					// Check if listener was closed
-					if opErr, ok := err.(*net.OpError); ok && opErr.Err.Error() == "use of closed network connection" {
-						return
-					}
-					if verbose {
-						logger.Printf("Error accepting SOCKS5 connection: %v\n", err)
-					}
+				if errors.Is(err, net.ErrClosed) {
 					return
 				}
+				if verbose {
+					logger.Printf("Error accepting SOCKS5 connection: %v\n", err)
+				}
+				return
 			}
 			go handleSOCKS5(client, localConn, verbose, logger)
 		}
@@ -550,27 +539,27 @@ func setupDynamicForward(client *ssh.Client, forwardSpec string, verbose bool, l
 func handleSOCKS5(client *ssh.Client, localConn net.Conn, verbose bool, logger *log.Logger) {
 	defer localConn.Close()
 
-	// SOCKS5 handshake
-	buf := make([]byte, 256)
-
-	// Read version and methods
-	n, err := localConn.Read(buf)
-	if err != nil || n < 2 {
+	// Read greeting: VER NMETHODS
+	greeting := make([]byte, 2)
+	if _, err := io.ReadFull(localConn, greeting); err != nil {
 		if verbose {
 			logger.Printf("SOCKS5 handshake failed: %v\n", err)
 		}
 		return
 	}
-
-	// Check SOCKS version
-	if buf[0] != 0x05 {
+	if greeting[0] != 0x05 {
 		if verbose {
-			logger.Printf("Not SOCKS5 protocol: version=%d\n", buf[0])
+			logger.Printf("Not SOCKS5 protocol: version=%d\n", greeting[0])
 		}
 		return
 	}
+	// Drain the methods list (we always respond with "no auth")
+	methods := make([]byte, greeting[1])
+	if _, err := io.ReadFull(localConn, methods); err != nil {
+		return
+	}
 
-	// Send "no authentication required" response
+	// Reply: no authentication required
 	if _, err := localConn.Write([]byte{0x05, 0x00}); err != nil {
 		if verbose {
 			logger.Printf("Failed to send auth response: %v\n", err)
@@ -578,71 +567,68 @@ func handleSOCKS5(client *ssh.Client, localConn net.Conn, verbose bool, logger *
 		return
 	}
 
-	// Read connection request
-	n, err = localConn.Read(buf)
-	if err != nil || n < 7 {
+	// Read request header: VER CMD RSV ATYP
+	reqHeader := make([]byte, 4)
+	if _, err := io.ReadFull(localConn, reqHeader); err != nil {
 		if verbose {
 			logger.Printf("Failed to read connection request: %v\n", err)
 		}
 		return
 	}
-
-	// Check version and command
-	if buf[0] != 0x05 || buf[1] != 0x01 {
+	if reqHeader[0] != 0x05 || reqHeader[1] != 0x01 {
 		if verbose {
-			logger.Printf("Invalid SOCKS5 request: version=%d, cmd=%d\n", buf[0], buf[1])
+			logger.Printf("Invalid SOCKS5 request: version=%d, cmd=%d\n", reqHeader[0], reqHeader[1])
 		}
-		// Send failure response
 		localConn.Write([]byte{0x05, 0x07, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 		return
 	}
 
-	// Parse address
-	addrType := buf[3]
+	// Parse address by type
+	portBytes := make([]byte, 2)
 	var host string
-	var port uint16
 
-	switch addrType {
+	switch reqHeader[3] {
 	case 0x01: // IPv4
-		if n < 10 {
-			if verbose {
-				logger.Printf("Invalid IPv4 address length\n")
-			}
-			localConn.Write([]byte{0x05, 0x07, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		addr := make([]byte, 4)
+		if _, err := io.ReadFull(localConn, addr); err != nil {
 			return
 		}
-		host = fmt.Sprintf("%d.%d.%d.%d", buf[4], buf[5], buf[6], buf[7])
-		port = uint16(buf[8])<<8 | uint16(buf[9])
+		if _, err := io.ReadFull(localConn, portBytes); err != nil {
+			return
+		}
+		host = net.IP(addr).String()
 	case 0x03: // Domain name
-		addrLen := int(buf[4])
-		if n < 5+addrLen+2 {
-			if verbose {
-				logger.Printf("Invalid domain name length\n")
-			}
-			localConn.Write([]byte{0x05, 0x07, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		lenBuf := make([]byte, 1)
+		if _, err := io.ReadFull(localConn, lenBuf); err != nil {
 			return
 		}
-		host = string(buf[5 : 5+addrLen])
-		port = uint16(buf[5+addrLen])<<8 | uint16(buf[5+addrLen+1])
+		domain := make([]byte, lenBuf[0])
+		if _, err := io.ReadFull(localConn, domain); err != nil {
+			return
+		}
+		if _, err := io.ReadFull(localConn, portBytes); err != nil {
+			return
+		}
+		host = string(domain)
 	case 0x04: // IPv6
-		if n < 22 {
-			if verbose {
-				logger.Printf("Invalid IPv6 address length\n")
-			}
-			localConn.Write([]byte{0x05, 0x07, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		addr := make([]byte, 16)
+		if _, err := io.ReadFull(localConn, addr); err != nil {
 			return
 		}
-		host = net.IP(buf[4:20]).String()
-		port = uint16(buf[20])<<8 | uint16(buf[21])
+		if _, err := io.ReadFull(localConn, portBytes); err != nil {
+			return
+		}
+		host = net.IP(addr).String()
 	default:
 		if verbose {
-			logger.Printf("Unsupported address type: %d\n", addrType)
+			logger.Printf("Unsupported address type: %d\n", reqHeader[3])
 		}
 		localConn.Write([]byte{0x05, 0x08, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 		return
 	}
 
-	targetAddr := fmt.Sprintf("%s:%d", host, port)
+	port := uint16(portBytes[0])<<8 | uint16(portBytes[1])
+	targetAddr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 	if verbose {
 		logger.Printf("SOCKS5 forwarding to: %s\n", targetAddr)
 	}
@@ -653,7 +639,6 @@ func handleSOCKS5(client *ssh.Client, localConn net.Conn, verbose bool, logger *
 		if verbose {
 			logger.Printf("Failed to dial %s: %v\n", targetAddr, err)
 		}
-		// Send connection refused
 		localConn.Write([]byte{0x05, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 		return
 	}
@@ -667,18 +652,12 @@ func handleSOCKS5(client *ssh.Client, localConn net.Conn, verbose bool, logger *
 		return
 	}
 
-	// Bidirectional copy
-	done := make(chan struct{}, 2)
-
+	// Bidirectional copy: one direction in goroutine, one in current goroutine
+	done := make(chan struct{}, 1)
 	go func() {
 		io.Copy(remoteConn, localConn)
 		done <- struct{}{}
 	}()
-
-	go func() {
-		io.Copy(localConn, remoteConn)
-		done <- struct{}{}
-	}()
-
+	io.Copy(localConn, remoteConn)
 	<-done
 }
