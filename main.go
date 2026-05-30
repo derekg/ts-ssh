@@ -469,18 +469,18 @@ func extractURL(msg string) string {
 
 // setupDynamicForward sets up SOCKS5 dynamic port forwarding
 func setupDynamicForward(client *ssh.Client, forwardSpec string, verbose bool, logger *log.Logger) error {
-	// Parse bind address and port from forwardSpec
-	// Format can be: "port" or "bind_address:port"
+	// Parse bind address and port from forwardSpec.
+	// Format: "port" or "bind_address:port" or "[ipv6]:port"
 	bindAddr := "localhost"
 	port := forwardSpec
 
 	if strings.Contains(forwardSpec, ":") {
-		parts := strings.Split(forwardSpec, ":")
-		if len(parts) != 2 {
+		host, p, err := net.SplitHostPort(forwardSpec)
+		if err != nil {
 			return fmt.Errorf("invalid dynamic forward specification: %s", forwardSpec)
 		}
-		bindAddr = parts[0]
-		port = parts[1]
+		bindAddr = host
+		port = p
 	}
 
 	// Validate port

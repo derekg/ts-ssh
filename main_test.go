@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"testing"
 )
 
@@ -511,7 +512,7 @@ func TestParseDynamicForwardSpec(t *testing.T) {
 		},
 		{
 			name:         "ipv6 localhost:port",
-			forwardSpec:  "::1:1080",
+			forwardSpec:  "[::1]:1080",
 			wantBindAddr: "::1",
 			wantPort:     "1080",
 			wantErr:      false,
@@ -554,15 +555,15 @@ func TestParseDynamicForwardSpec(t *testing.T) {
 			port := tt.forwardSpec
 
 			if contains(tt.forwardSpec, ":") {
-				parts := splitString(tt.forwardSpec, ":")
-				if len(parts) != 2 {
+				host, p, err := net.SplitHostPort(tt.forwardSpec)
+				if err != nil {
 					if !tt.wantErr {
-						t.Errorf("Expected success but got invalid format")
+						t.Errorf("Expected success but got invalid format: %v", err)
 					}
 					return
 				}
-				bindAddr = parts[0]
-				port = parts[1]
+				bindAddr = host
+				port = p
 			}
 
 			if tt.wantErr {
