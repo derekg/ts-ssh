@@ -31,6 +31,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Warning: Failed to initialize security audit logging: %v\n", err)
 	}
 	defer security.CloseSecurityLogger()
+	security.SetVersion(version)
 
 	// Parse flags
 	var (

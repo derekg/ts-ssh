@@ -9,8 +9,13 @@ import (
 	"time"
 )
 
-// version represents the application version for logging
-var version = "0.4.0"
+// version is set by main via SetVersion after ldflags injection
+var version = "dev"
+
+// SetVersion lets main inject the build-time version into audit logs.
+func SetVersion(v string) {
+	version = v
+}
 
 // SecurityEvent represents a security-relevant event for audit logging
 type SecurityEvent struct {

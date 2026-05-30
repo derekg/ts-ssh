@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-VERSION="v0.8.0"
-OUTPUT_DIR="releases/v0.8.0"
+VERSION="v0.8.1"
+OUTPUT_DIR="releases/v0.8.1"
 
 # Build function
 build() {
